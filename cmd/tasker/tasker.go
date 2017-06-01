@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/oatmealraisin/tasker/pkg/tasker"
 
 	"github.com/spf13/cobra"
 )
@@ -74,22 +75,27 @@ func run() error {
 
 	postgreLogsFile = ""
 	if postgreURL == "" {
-		err = startPostgre()
+		postgres, err := startPostgre()
 		if err != nil {
 			return err
 		}
+		defer postgres.Process.Kill()
 	}
 
 	db, err := connectPostgre()
 	if err != nil {
 		return err
+	} else {
+		defer db.Close()
 	}
 
 	if err = db.Ping(); err != nil {
 		return err
 	}
 
-	fmt.Println("SUCCESS!")
+	if err = tasker.Start(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -108,7 +114,7 @@ func setup() error {
 	return nil
 }
 
-func startPostgre() error {
+func startPostgre() (*exec.Cmd, error) {
 	if postgreUser == "" {
 		postgreUser = "plant"
 	}
@@ -118,14 +124,14 @@ func startPostgre() error {
 	if _, err := os.Stat(postgreDirectory); err != nil && os.IsNotExist(err) {
 		fmt.Println("Creating data dir:", postgreDirectory)
 		if err := os.MkdirAll(postgreDirectory, os.ModePerm); err != nil {
-			return fmt.Errorf("Could not create postgre data directory, %s", err.Error())
+			return nil, fmt.Errorf("Could not create postgre data directory, %s", err.Error())
 		}
 	}
 
 	fmt.Println("Initializing database..")
 	initdb, err := exec.LookPath("initdb")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	output, err := exec.Command(initdb,
@@ -133,16 +139,16 @@ func startPostgre() error {
 		"-U", "plant",
 	).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("initdb: %s\n%s", err.Error(), output)
+		return nil, fmt.Errorf("initdb: %s\n%s", err.Error(), output)
 	}
 
 	fmt.Println("Starting PostgreSQL..")
-	postgres, err := exec.LookPath("postgres")
+	postgre, err := exec.LookPath("postgres")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = exec.Command(postgres,
+	postgres := exec.Command(postgre,
 		//"--single",
 		//"-c max_connections=1",
 		"-c", "listen_addresses=",
@@ -150,10 +156,12 @@ func startPostgre() error {
 		//fmt.Sprintf("-p %s", "6666"),
 		"-D", filepath.Join(postgreDirectory, "database"),
 		"-c", fmt.Sprintf("unix_socket_directories=%s", postgreDirectory),
-	).Start()
+	)
+
+	err = postgres.Start()
 
 	if err != nil {
-		return fmt.Errorf("postgres: %s", err.Error())
+		return nil, fmt.Errorf("postgres: %s", err.Error())
 	}
 
 	time.Sleep(3 * time.Second)
@@ -161,7 +169,7 @@ func startPostgre() error {
 	fmt.Println("Creating database..")
 	createdb, err := exec.LookPath("createdb")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	output, err = exec.Command(createdb, "plant",
@@ -169,11 +177,15 @@ func startPostgre() error {
 		"-U", postgreUser,
 	).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("createdb: %s\n%s", err.Error(), output)
+		return nil, fmt.Errorf("createdb: %s\n%s", err.Error(), output)
 	}
 
 	postgreURL = postgreDirectory
 
+	return postgres, nil
+}
+
+func stopPostgre() error {
 	return nil
 }
 
