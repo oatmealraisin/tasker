@@ -1,0 +1,16 @@
+syntax = "proto3";
+package models;
+
+import "google/protobuf/timestamp.proto";
+
+message Task {
+  uint32 guid = 1;
+  string name = 2;
+  uint32 size = 3;
+  google.protobuf.Timestamp added = 4;
+  google.protobuf.Timestamp finished = 5;
+  bool isFinished = 6;
+  repeated string tags = 7;
+  uint32 priority = 8;
+  string url = 9;
+}
