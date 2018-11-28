@@ -1,31 +1,26 @@
-// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package cmd
 
 import (
+	"encoding/csv"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/oatmealraisin/tasker/pkg/models"
+	"github.com/oatmealraisin/tasker/pkg/storage"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
-	name string
-	size string
-	tags string
+	name       string
+	size       int
+	tags       string
+	priority   int
+	url        string
+	importFile string
+	dryRun     bool
 )
 
 // addCmd represents the add command
@@ -44,14 +39,20 @@ to quickly create a Cobra application.`,
 		}
 	},
 	RunE: add,
+	// TODO:
+	// PreRun: validate,
 }
 
 func init() {
 	TaskerCmd.AddCommand(addCmd)
 
-	startCmd.Flags().StringVarP(&name, "name", "n", "", "Display name of the task")
-	startCmd.Flags().StringVarP(&size, "size", "s", "", "Sizing for this task")
-	startCmd.Flags().StringVarP(&tags, "tags", "t", "", "Tags to put this task in")
+	addCmd.Flags().StringVarP(&name, "name", "n", "", "Display name of the task")
+	addCmd.Flags().IntVarP(&size, "size", "s", 0, "Sizing for this task")
+	addCmd.Flags().StringVarP(&tags, "tags", "t", "", "Tags to put this task in")
+	addCmd.Flags().IntVarP(&priority, "priority", "p", -1, "The priority of this task, how important it is.")
+	addCmd.Flags().StringVarP(&url, "url", "u", "", "Any URL resource associated with this tasks, such as an article.")
+	addCmd.Flags().StringVarP(&importFile, "from-file", "f", "", "Import tasks from a file. Can be csv.")
+	addCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Go through the steps but do nothing.")
 }
 
 func add(cmd *cobra.Command, args []string) error {
@@ -59,14 +60,49 @@ func add(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	name := cmd.Flag("name").Value.String()
-	size := cmd.Flag("size").Value.String()
-	tags := cmd.Flag("tags").Value.String()
+	tasks := []models.Task{}
 
-	newTask := &models.Task{
-		Name: name,
-		Size: size,
-		Tags: tags.split(" "),
+	if importFile != "" {
+		f, err := ioutil.ReadFile(importFile)
+		if err != nil {
+			return err
+		}
+		input := string(f)
+
+		records, err := csv.NewReader(strings.NewReader(input)).ReadAll()
+		if err != nil {
+			return err
+		}
+
+		for i, record := range records {
+			if i == 0 {
+				continue
+			}
+
+			newTask, err := storage.TaskFromCsv(record)
+			if err != nil {
+				return err
+			}
+			tasks = append(tasks, newTask)
+		}
+
+	} else {
+		newTask := models.Task{
+			Name: name,
+			Size: uint32(size),
+			Tags: strings.Split(tags, viper.GetString("Delim")),
+		}
+
+		tasks = append(tasks, newTask)
+	}
+
+	// TODO: Only submit if all tasks are valid
+	for _, task := range tasks {
+		//	fmt.Printf("%d, %s, %d\n", task.Guid, task.Name, task.Size)
+		err := db.CreateTask(task)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -74,8 +110,22 @@ func add(cmd *cobra.Command, args []string) error {
 
 func validate(cmd *cobra.Command, args []string) error {
 	// TODO: Implement
-	if len(cmd.Flag("name").Value.String()) == 0 {
+	if importFile != "" && (name != "" || size != 0 || tags != "" || priority < 0 || url != "") {
+		//return fmt.Errorf("-f/--from-file cannot be used with other flags.")
+	}
+
+	if importFile != "" {
+		return nil
+	}
+
+	// TODO: Check for import_file existence and readable
+
+	if len(name) == 0 {
 		return fmt.Errorf("Need to provide name to add new task")
+	}
+
+	if size == 0 {
+
 	}
 	return nil
 }

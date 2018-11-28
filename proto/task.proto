@@ -4,13 +4,30 @@ package models;
 import "google/protobuf/timestamp.proto";
 
 message Task {
-  uint32 guid = 1;
+  uint64 guid = 1;
   string name = 2;
-  uint32 size = 3;
-  google.protobuf.Timestamp added = 4;
-  google.protobuf.Timestamp finished = 5;
-  bool isFinished = 6;
-  repeated string tags = 7;
-  uint32 priority = 8;
-  string url = 9;
+  repeated string tags = 3;
+
+  // NOTE: One day priority may be set automatically
+  uint32 priority = 4;
+  uint32 size = 5;
+
+  google.protobuf.Timestamp added = 6;
+  google.protobuf.Timestamp active = 7;
+  google.protobuf.Timestamp due = 8;
+  // finished is an overloaded variable. There are a few cases to consider
+  // * Finished is unset, which means the Task is not done
+  // * Finished is after today, which is an error
+  // * Finished is today or before today, when the Task is done
+  // However, there is the case where we want to stop tracking the Task.
+  google.protobuf.Timestamp finished = 9;
+  bool removed = 10;
+
+  bool repeats = 12;
+  uint32 guidPrevious = 11;
+
+  string url = 13;
+
+  repeated uint64 subtasks = 14;
+  repeated uint64 dependencies = 15;
 }
