@@ -36,7 +36,7 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	TaskerCmd.AddCommand(completeCmd)
+	//TaskerCmd.AddCommand(completeCmd)
 
 	// Here you will define your flags and configuration settings.
 
