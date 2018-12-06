@@ -28,6 +28,9 @@ message Task {
 
   string url = 13;
 
-  repeated uint64 subtasks = 14;
-  repeated uint64 dependencies = 15;
+  uint64 parent = 14;
+  repeated uint64 subtasks = 15;
+
+  repeated uint64 dependencies = 16;
+  repeated uint64 dependants = 17;
 }
