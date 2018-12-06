@@ -49,7 +49,7 @@ func TaskToCSV(task models.Task) string {
 		finished = time_finished.Format("2006-01-02")
 	}
 
-	result := fmt.Sprintf("%d,%s,%d,%s,%s,%t,%t,%s,%d,%s,%s,%s\n",
+	result := fmt.Sprintf("%d,%s,%d,%s,%s,%t,%t,%s,%d,%s,%d,%s,%s\n",
 		task.Guid,
 		task.Name,
 		task.Size,
@@ -60,6 +60,7 @@ func TaskToCSV(task models.Task) string {
 		strings.Join(task.Tags, "|"),
 		task.Priority,
 		task.Url,
+		task.Parent,
 		subtasks,
 		depends,
 	)
@@ -71,20 +72,20 @@ func TaskFromCsv(record []string) (models.Task, error) {
 	newTask := models.Task{}
 	var err error
 
-	if len(record) != 12 {
+	if len(record) != 13 {
 		return newTask, fmt.Errorf("CSV line doesn't have right number of columns.\n%s\n", record)
 	}
 
 	guid, err := strconv.Atoi(record[0])
 	if err != nil {
-		return newTask, err
+		return newTask, fmt.Errorf("TaskFromCSV: Could not extract guid: %s\n", err)
 	}
 
 	var size int
 	if record[2] != "" {
 		size, err = strconv.Atoi(record[2])
 		if err != nil {
-			return newTask, err
+			return newTask, fmt.Errorf("TaskFromCSV: Could not extract size: %s\n", err)
 		}
 	}
 
@@ -127,17 +128,24 @@ func TaskFromCsv(record []string) (models.Task, error) {
 	if record[8] != "" {
 		priority, err = strconv.Atoi(record[8])
 		if err != nil {
-			return newTask, err
+			return newTask, fmt.Errorf("TaskFromCSV: Could not extract priority: %s\n", err)
+		}
+	}
+
+	var parent uint64
+	if record[10] != "" {
+		if p, err := strconv.ParseUint(record[10], 10, 64); err == nil {
+			parent = uint64(p)
 		}
 	}
 
 	subtasks := []uint64{}
-	if record[10] != "" {
-		strSubTasks := strings.Split(record[10], "|")
+	if record[11] != "" {
+		strSubTasks := strings.Split(record[11], "|")
 		for _, strSubTask := range strSubTasks {
 			subtask, err := strconv.Atoi(strSubTask)
 			if err != nil {
-				return newTask, err
+				return newTask, fmt.Errorf("TaskFromCSV: Could not extract subtasks: %s\n", err)
 			}
 
 			subtasks = append(subtasks, uint64(subtask))
@@ -145,12 +153,12 @@ func TaskFromCsv(record []string) (models.Task, error) {
 	}
 
 	depends := []uint64{}
-	if record[11] != "" {
-		strDepends := strings.Split(record[11], "|")
+	if record[12] != "" {
+		strDepends := strings.Split(record[12], "|")
 		for _, strDepend := range strDepends {
 			depend, err := strconv.Atoi(strDepend)
 			if err != nil {
-				return newTask, err
+				return newTask, fmt.Errorf("TaskFromCSV: Could not extract dependencies: %s\n", err)
 			}
 
 			depends = append(depends, uint64(depend))
@@ -168,6 +176,7 @@ func TaskFromCsv(record []string) (models.Task, error) {
 		Tags:         strings.Split(record[7], "|"),
 		Priority:     uint32(priority),
 		Url:          record[9],
+		Parent:       parent,
 		Subtasks:     subtasks,
 		Dependencies: depends,
 	}
@@ -268,10 +277,10 @@ func (c *CsvStorage) GetAllTasks() ([]models.Task, error) {
 func (c *CsvStorage) writeAll() error {
 
 	if err := c.f.Truncate(0); err != nil {
-		return err
+		return fmt.Errorf("CsvStorage.writeAll: %s", err)
 	}
 	if _, err := c.f.Seek(0, 0); err != nil {
-		return err
+		return fmt.Errorf("CsvStorage.writeAll: %s", err)
 	}
 
 	keys := []uint64{}
@@ -283,7 +292,7 @@ func (c *CsvStorage) writeAll() error {
 
 	for _, k := range keys {
 		if _, err := c.f.WriteString(TaskToCSV(*c.buffer_guid[k])); err != nil {
-			return err
+			return fmt.Errorf("CsvStorage.writeAll: %s", err)
 		}
 	}
 
@@ -302,7 +311,7 @@ func (c *CsvStorage) CreateTask(t models.Task) error {
 	c.updateBuffers(p_t)
 
 	if err := c.writeAll(); err != nil {
-		return err
+		return fmt.Errorf("CsvStorage.CreateTask: %s", err.Error())
 	}
 
 	return nil
