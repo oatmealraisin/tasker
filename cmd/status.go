@@ -17,6 +17,7 @@ import (
 
 var (
 	showFinished bool
+	numShow      int
 )
 
 // addCmd represents the add command
@@ -36,6 +37,7 @@ func init() {
 	TaskerCmd.AddCommand(statusCmd)
 
 	statusCmd.Flags().BoolVarP(&showFinished, "finished", "f", false, "Display even finished tasks.")
+	statusCmd.Flags().IntVarP(&numShow, "number", "n", 10, "Number of tasks to display.")
 }
 
 func status(cmd *cobra.Command, args []string) error {
@@ -70,18 +72,23 @@ func status(cmd *cobra.Command, args []string) error {
 	})
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
-	fmt.Fprintln(w, "Name\tSize\tAge\tTags\t")
+	fmt.Fprintln(w, "Name\tSize\tAge\tTags\t\t")
 
 	i := 0
 	for _, task := range tasks {
-		if i >= 10 {
+		if i >= numShow {
 			break
 		}
 
 		add_time, err := ptypes.Timestamp(task.Added)
 
 		if err == nil && add_time.After(time.Now()) {
-			continue
+			y, m, d := add_time.Date()
+			y_n, m_n, d_n := time.Now().Date()
+
+			if !(y <= y_n && m <= m_n && d <= d_n) {
+				continue
+			}
 		}
 
 		// TODO: Implement subtasks
@@ -99,8 +106,28 @@ func status(cmd *cobra.Command, args []string) error {
 			if time_added, err := ptypes.Timestamp(task.Added); err == nil {
 				age = strconv.Itoa(int(math.Floor(time.Since(time_added).Hours() / 24.0)))
 			}
+
 			i++
-			fmt.Fprintln(w, fmt.Sprintf("%s\t%d\t%s days\t(%s)\t", task.Name, task.Size, age, strings.Join(task.Tags, "|")))
+
+			var url string
+			var nameString string
+			if parent, err := db.GetTask(task.Parent); err == nil && parent.Guid != 0 {
+				if parent.Url != "" {
+					url = "(+)"
+				}
+
+				fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t(%s)\t\t", parent.Name, url))
+				nameString = fmt.Sprintf("└──> %s", task.Name)
+				url = ""
+			} else {
+				nameString = task.Name
+			}
+
+			if task.Url != "" {
+				url = "(+)"
+			}
+
+			fmt.Fprintln(w, fmt.Sprintf("%s\t%d\t%s days\t(%s)\t%s\t", nameString, task.Size, age, strings.Join(task.Tags, "|"), url))
 		}
 	cont:
 	}
