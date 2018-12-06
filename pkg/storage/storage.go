@@ -14,6 +14,8 @@ type Storage interface {
 	GetByTag(tag string) ([]models.Task, error)
 	GetByName(name string) ([]models.Task, error)
 	GetAllTasks() ([]models.Task, error)
+
+	DeleteTask(guid uint64) error
 }
 
 func setupStorageDir() error {
