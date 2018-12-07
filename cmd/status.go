@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -91,46 +92,7 @@ func status(cmd *cobra.Command, args []string) error {
 
 			// Confirm for selection, we can't fail after this
 			i++
-
-			var url string
-			var nameString string
-			var due string
-			age := "?"
-
-			if time_added, err := ptypes.Timestamp(task.Added); err == nil {
-				age = strconv.Itoa(int(math.Floor(time.Since(time_added).Hours() / 24.0)))
-			}
-
-			if parent, err := db.GetTask(task.Parent); err == nil && parent.Guid != 0 {
-				if parent.Url != "" {
-					url = "(+)"
-				}
-
-				fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", parent.Name, url))
-				nameString = fmt.Sprintf("└──> %s", task.Name)
-				url = ""
-			} else {
-				nameString = task.Name
-			}
-
-			if task.Due != nil {
-				if due_time, err := ptypes.Timestamp(task.Due); err == nil {
-					num_days := int(math.Floor(time.Until(due_time).Hours() / 24.0))
-					if num_days == 0 {
-						due = "Today"
-					} else if num_days == 1 {
-						due = "Tmrw"
-					} else {
-						due = fmt.Sprintf("%sd", strconv.Itoa(num_days))
-					}
-				}
-			}
-
-			if task.Url != "" {
-				url = "(+)"
-			}
-
-			fmt.Fprintln(w, fmt.Sprintf("%s\t%d %d\t%sd\t%s\t(%s)\t%s\t", nameString, task.Size, task.Priority, age, due, strings.Join(task.Tags, "|"), url))
+			printTask(w, task)
 		}
 	cont:
 	}
@@ -142,6 +104,94 @@ func status(cmd *cobra.Command, args []string) error {
 
 func status_validate(cmd *cobra.Command, args []string) error {
 	// TODO: Implement
+	return nil
+}
+
+func printTask(w io.Writer, task models.Task) error {
+	var nameString string
+
+	if task.Parent != 0 {
+		parent, err := db.GetTask(task.Parent)
+		if err != nil {
+			return err
+		}
+
+		nameString = fmt.Sprintf("└──> %s", task.Name)
+
+		var parentString string
+		if parent.Parent != 0 {
+			grand, err := db.GetTask(parent.Parent)
+			if err != nil {
+				return err
+			}
+
+			if grand.Url != "" {
+				url = "(+)"
+			}
+
+			if grand.Parent != 0 {
+				for grand.Parent != 0 {
+					new_grand, err := db.GetTask(grand.Parent)
+					if err != nil {
+						return err
+					}
+
+					grand = new_grand
+				}
+			}
+
+			fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", grand.Name, url))
+			parentString = fmt.Sprintf("└┬─> %s", parent.Name)
+			nameString = fmt.Sprintf(" %s", nameString)
+		} else {
+			parentString = parent.Name
+		}
+
+		if parent.Url != "" {
+			url = "(+)"
+		}
+
+		fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", parentString, url))
+		url = ""
+	} else {
+		nameString = task.Name
+	}
+
+	var due string
+	if task.Due != nil {
+		if due_time, err := ptypes.Timestamp(task.Due); err == nil {
+			num_days := int(math.Floor(time.Until(due_time).Hours() / 24.0))
+			if num_days == 0 {
+				due = "Today"
+			} else if num_days == 1 {
+				due = "Tmrw"
+			} else {
+				due = fmt.Sprintf("%sd", strconv.Itoa(num_days))
+			}
+		}
+	}
+
+	age := "?"
+	if time_added, err := ptypes.Timestamp(task.Added); err == nil {
+		num_days := int(math.Floor(time.Since(time_added).Hours() / 24.0))
+		if num_days == 0 {
+			age = "New"
+		} else if num_days < 30 {
+			age = fmt.Sprintf("%sd", strconv.Itoa(num_days))
+		} else if num_days < 360 {
+			age = fmt.Sprintf("%sm", strconv.Itoa(num_days/30.0))
+		} else {
+			age = ">1y"
+		}
+	}
+
+	var url string
+	if task.Url != "" {
+		url = "(+)"
+	}
+
+	fmt.Fprintln(w, fmt.Sprintf("%s\t %d %d\t%s\t%s\t(%s)\t%s\t", nameString, task.Size, task.Priority, age, due, strings.Join(task.Tags, "|"), url))
+
 	return nil
 }
 
