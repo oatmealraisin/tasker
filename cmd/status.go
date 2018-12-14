@@ -208,12 +208,17 @@ func calc_task_score(task models.Task) float64 {
 			return 0.0
 		}
 
-		due_mod = 24.0 / (time.Until(due_time).Hours())
+		due_mod = 24.0 / math.Exp(time.Until(due_time).Hours())
 	}
 
 	add_mod := math.Max(1.0, math.Log(time.Since(add_time).Hours()/24.0))
 
-	priority_mod := 2.5 * float64(task.Priority)
+	// TODO: Size and priority have a special relationship.. You want to do the
+	// smallest, most important tasks first, followed by the hardest, most
+	// important tasks. Change the formula to reflect this
+	// TODO: Also, the age kind of changes the priority.. or at least makes the
+	// priority less important. Should also change the formula to reflect this
+	priority_mod := math.Pow(3.0, float64(task.Priority)) * 0.075
 	size_mod := 0.5 * float64(task.Size)
 
 	return due_mod + add_mod/(priority_mod+size_mod)
