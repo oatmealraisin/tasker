@@ -8,11 +8,15 @@ import (
 	"github.com/oatmealraisin/tasker/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
-	cfg string
-	db  storage.Storage
+	cfg        string
+	db         storage.Storage
+	termWidth  int
+	termHeight int
 )
 
 // TaskerCmd represents the base command when called without any subcommands
@@ -75,5 +79,11 @@ func initConfig() {
 		panic("postgres not implemented")
 	default:
 		fmt.Printf("Unknown database type: %s", viper.GetString("StorageType"))
+	}
+
+	var err error
+	termWidth, termHeight, err = terminal.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		panic(err.Error())
 	}
 }
