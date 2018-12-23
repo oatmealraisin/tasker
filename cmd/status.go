@@ -47,22 +47,41 @@ func status(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tasks, err := db.GetAllTasks()
-	if err != nil {
-		return err
+	// TODO: Find a way to go through only some of the tasks.. not all
+	tasks := db.GetAllTasks()
+	if len(tasks) == 0 {
+		fmt.Println("It doesn't look like you have anything to do!")
+		return nil
 	}
 
 	sort.Slice(tasks, func(i, j int) bool {
-		return calc_task_score(tasks[i]) > calc_task_score(tasks[j])
+		a, err := db.GetTask(tasks[i])
+		if err != nil {
+			return false
+		}
+
+		b, err := db.GetTask(tasks[j])
+		if err != nil {
+			return true
+		}
+
+		return calc_task_score(a) > calc_task_score(b)
 	})
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 	fmt.Fprintln(w, "Name\tSize\tAge\tDue\tTags\t\t")
 
 	i := 0
-	for _, task := range tasks {
+	for _, uuid := range tasks {
 		if i >= numShow {
 			break
+		}
+
+		task, err := db.GetTask(uuid)
+		if err != nil {
+			// TODO: Log
+			fmt.Println("Could get get Task %d\n", uuid)
+			continue
 		}
 
 		add_time, err := ptypes.Timestamp(task.Added)

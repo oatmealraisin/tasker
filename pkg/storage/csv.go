@@ -269,30 +269,51 @@ func (c *CsvStorage) GetTask(guid uint64) (models.Task, error) {
 	}
 }
 
-func (c *CsvStorage) GetByTag(tag string) ([]models.Task, error) {
+func (c *CsvStorage) GetByTag(tag string) []uint64 {
 	panic("not implemented")
 }
 
-func (s *CsvStorage) GetByName(name string) ([]models.Task, error) {
-	result := make([]models.Task, len(s.buffer_name[name]))
+func (s *CsvStorage) GetByName(name string) []uint64 {
+	result := make([]uint64, len(s.buffer_name[name]))
 	if len(result) == 0 {
-		return nil, fmt.Errorf("No tasks of the name %s found.\n", name)
+		return nil
 	}
 
 	for i, task := range s.buffer_name[name] {
-		result[i] = *task
+		result[i] = task.Guid
 	}
 
-	return result, nil
+	return result
 }
 
-func (c *CsvStorage) GetAllTasks() ([]models.Task, error) {
+func (c *CsvStorage) GetAllTasks() []uint64 {
 	// NOTE: For now, we load everything into memory
-	result := []models.Task{}
-	for _, task := range c.queue {
-		result = append(result, task)
+	var result []uint64
+	var uuid uint64
+
+	_, err := c.f.Seek(0, 0)
+	if err != nil {
+		fmt.Printf("Error resetting task file: %s\n", err.Error())
 	}
-	return result, nil
+
+	r := csv.NewReader(c.f)
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			return result
+		}
+
+		uuid, err = strconv.ParseUint(record[0], 10, 64)
+		if err != nil {
+			// TODO: Log
+			fmt.Printf("Invalid UUID: %s", record[0])
+		}
+
+		result = append(result, uuid)
+	}
+
+	return result
 }
 
 // TODO: This is terrible

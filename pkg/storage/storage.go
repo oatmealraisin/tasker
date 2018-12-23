@@ -11,9 +11,9 @@ type Storage interface {
 	CreateTask(t models.Task) error
 	CreateTasks(t []models.Task) []error
 	GetTask(guid uint64) (models.Task, error)
-	GetByTag(tag string) ([]models.Task, error)
-	GetByName(name string) ([]models.Task, error)
-	GetAllTasks() ([]models.Task, error)
+	GetByTag(tag string) []uint64
+	GetByName(name string) []uint64
+	GetAllTasks() []uint64
 
 	DeleteTask(guid uint64) error
 }
