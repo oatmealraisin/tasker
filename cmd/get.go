@@ -1,29 +1,17 @@
-// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package cmd
 
 import (
-	"fmt"
+	"log"
+	"strconv"
 
+	"github.com/oatmealraisin/tasker/pkg/models"
 	"github.com/spf13/cobra"
 )
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get",
-	Short: "A brief description of your command",
+	Short: "Retrieve specific information about specific tasks",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
@@ -31,12 +19,37 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("get called")
+		if err := cmd.RunE(cmd, args); err != nil {
+			log.Fatal(err.Error())
+		}
 	},
+	RunE: get,
+}
+
+func get(cmd *cobra.Command, args []string) error {
+	var tasks []uint64
+	if args[0] == "all" {
+		tasks = db.GetAllTasks()
+	} else {
+		uuid, err := strconv.ParseUint(args[0], 10, 64)
+		if err != nil {
+			return err
+		}
+
+		if _, err := db.GetTask(uuid); err != nil {
+			return err
+		}
+
+		tasks = []uint64{uuid}
+	}
+
+	models.PrintTasks(tasks, db.GetTask)
+
+	return nil
 }
 
 func init() {
-	//TaskerCmd.AddCommand(getCmd)
+	TaskerCmd.AddCommand(getCmd)
 
 	// Here you will define your flags and configuration settings.
 
