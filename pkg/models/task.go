@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func (task Task) Score() float64 {
@@ -47,10 +48,17 @@ func (tasks Tasks) Pretty() string {
 	return ""
 }
 
-// TODO: Change to passing a function instead of the db, for read only access
 func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 	var nameString string
 	var url string
+
+	termWidth, _, err := terminal.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// TODO: Modify to start removing columns to fit screen
+	maxSize := termWidth - 55
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 	fmt.Fprintln(w, "Name\tSize\tAge\tDue\tTags\t\t")
@@ -99,7 +107,12 @@ func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 					}
 				}
 
-				fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", grand.Name, url))
+				grandName := grand.Name
+				if len(grandName) > maxSize {
+					grandName = fmt.Sprintf("%s ...", grandName[:maxSize])
+				}
+
+				fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", grandName, url))
 				parentString = fmt.Sprintf("└┬─> %s", parent.Name)
 				nameString = fmt.Sprintf(" %s", nameString)
 			} else {
@@ -108,6 +121,10 @@ func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 
 			if parent.Url != "" {
 				url = "(+)"
+			}
+
+			if len(parentString) > maxSize {
+				parentString = fmt.Sprintf("%s ...", parentString[:maxSize])
 			}
 
 			fmt.Fprintln(w, fmt.Sprintf("%s\t\t\t\t%s\t", parentString, url))
@@ -147,6 +164,10 @@ func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 		var url string
 		if task.Url != "" {
 			url = "(+)"
+		}
+
+		if len(nameString) > maxSize {
+			nameString = fmt.Sprintf("%s ...", nameString[:maxSize])
 		}
 
 		fmt.Fprintln(w, fmt.Sprintf("%s\t %d %d\t%s\t%s\t(%s)\t%s\t", nameString, task.Size, task.Priority, age, due, strings.Join(task.Tags, "|"), url))
