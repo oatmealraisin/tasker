@@ -84,6 +84,7 @@ func initConfig() {
 	var err error
 	termWidth, termHeight, err = terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		panic(err.Error())
+		fmt.Printf("%s\n", err.Error())
+		termWidth = 200
 	}
 }
