@@ -20,6 +20,190 @@ type CsvStorage struct {
 	f *os.File
 }
 
+func NewCsvStorage(filename string) Storage {
+	var err error
+
+	err = setupStorageDir()
+	if err != nil {
+		return nil
+	}
+
+	newDb, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil
+	}
+
+	result := new(CsvStorage)
+	result.bufferStorage = newBufferStorage()
+	result.f = newDb
+
+	result.loadTasks(10000)
+
+	return result
+}
+
+func (c *CsvStorage) GetTask(guid uint64) (models.Task, error) {
+	if guid == 0 {
+		return models.Task{}, getZeroGuidError{}
+	}
+
+	if _, ok := c.buffer_guid[guid]; !ok {
+		return c.getTaskFromFile(guid)
+	}
+
+	return *c.buffer_guid[guid], nil
+}
+
+func (c *CsvStorage) GetByTag(tag string) []uint64 {
+	panic("not implemented")
+}
+
+func (s *CsvStorage) GetByName(name string) []uint64 {
+	result := make([]uint64, len(s.buffer_name[name]))
+	if len(result) == 0 {
+		return nil
+	}
+
+	for i, task := range s.buffer_name[name] {
+		result[i] = task.Guid
+	}
+
+	return result
+}
+
+func (c *CsvStorage) GetAllTasks() []uint64 {
+	// NOTE: For now, we load everything into memory
+	var result []uint64
+	var uuid uint64
+
+	_, err := c.f.Seek(0, 0)
+	if err != nil {
+		fmt.Printf("Error resetting task file: %s\n", err.Error())
+	}
+
+	r := csv.NewReader(c.f)
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			return result
+		}
+
+		uuid, err = strconv.ParseUint(record[0], 10, 64)
+		if err != nil {
+			// TODO: Log
+			fmt.Printf("Invalid UUID: %s", record[0])
+		}
+
+		result = append(result, uuid)
+	}
+
+	return result
+}
+
+func (c *CsvStorage) CreateTask(t models.Task) error {
+	if task, err := c.GetTask(t.Guid); err == nil {
+		return fmt.Errorf("Task with GUID %d already exists:\n\t%s\n", t.Guid, task.Name)
+	} else {
+		if _, ok := err.(getZeroGuidError); !ok {
+			return err
+		}
+
+		t.Guid = c.getNextGuid()
+	}
+
+	if t.Added == nil {
+		t.Added = ptypes.TimestampNow()
+	}
+
+	c.queue = append(c.queue, t)
+
+	p_t := &c.queue[len(c.queue)-1]
+
+	c.updateBuffers(p_t)
+
+	if err := c.writeAll(); err != nil {
+		return fmt.Errorf("CsvStorage.CreateTask: %s", err.Error())
+	}
+
+	return nil
+}
+
+func (c *CsvStorage) CreateTasks(t []models.Task) []error {
+	panic("not implemented")
+}
+
+// TODO: This is terrible
+func (c *CsvStorage) getNextGuid() uint64 {
+	keys := make([]uint64, 0, len(c.buffer_guid))
+	for k := range c.buffer_guid {
+		keys = append(keys, k)
+	}
+
+	models.UuidSort(keys)
+
+	return keys[len(keys)-1] + 1
+}
+
+func (s *CsvStorage) loadTasks(num int) {
+	s.queue = []models.Task{}
+
+	r := csv.NewReader(s.f)
+
+	for i := 0; i < num; i++ {
+		record, err := r.Read()
+		if err != nil {
+			if err != io.EOF {
+				fmt.Printf("Error reading CSV Storage: %s", err.Error())
+			}
+
+			return
+		}
+
+		newTask, err := TaskFromCsv(record)
+		if err != nil {
+			fmt.Printf("Error extracting task from CSV record: %s", err.Error())
+			continue
+		}
+
+		s.queue = append(s.queue, newTask)
+		p_t := &s.queue[len(s.queue)-1]
+		s.updateBuffers(p_t)
+	}
+}
+
+// TODO: This is terrible
+func (c *CsvStorage) writeAll() error {
+
+	if err := c.f.Truncate(0); err != nil {
+		return fmt.Errorf("CsvStorage.writeAll: %s", err)
+	}
+	if _, err := c.f.Seek(0, 0); err != nil {
+		return fmt.Errorf("CsvStorage.writeAll: %s", err)
+	}
+
+	keys := []uint64{}
+	for k, _ := range c.buffer_guid {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
+	for _, k := range keys {
+		if _, err := c.f.WriteString(TaskToCSV(*c.buffer_guid[k])); err != nil {
+			return fmt.Errorf("CsvStorage.writeAll: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *CsvStorage) getTaskFromFile(guid uint64) (models.Task, error) {
+	// NOTE: For now, we load everything into memory, so if we don't have a guid
+	// in the buffer, it doesn't exist
+	return models.Task{}, fmt.Errorf("CSV Storage Error: guid not found %d\n", guid)
+}
+
 func TaskToCSV(task models.Task) string {
 	var subtasks string
 	for _, guid := range task.Subtasks {
@@ -204,162 +388,4 @@ func TaskFromCsv(record []string) (models.Task, error) {
 	}
 
 	return newTask, nil
-}
-
-func (s *CsvStorage) loadTasks(num int) {
-	s.queue = []models.Task{}
-
-	r := csv.NewReader(s.f)
-
-	for i := 0; i < num; i++ {
-		record, err := r.Read()
-		if err != nil {
-			if err != io.EOF {
-				fmt.Printf("Error reading CSV Storage: %s", err.Error())
-			}
-
-			return
-		}
-
-		newTask, err := TaskFromCsv(record)
-		if err != nil {
-			fmt.Printf("Error extracting task from CSV record: %s", err.Error())
-			continue
-		}
-
-		s.queue = append(s.queue, newTask)
-		p_t := &s.queue[len(s.queue)-1]
-		s.updateBuffers(p_t)
-	}
-}
-
-func NewCsvStorage(filename string) Storage {
-	var err error
-
-	err = setupStorageDir()
-	if err != nil {
-		return nil
-	}
-
-	newDb, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return nil
-	}
-
-	result := new(CsvStorage)
-	result.bufferStorage = newBufferStorage()
-	result.f = newDb
-
-	result.loadTasks(10000)
-
-	return result
-}
-
-func (s *CsvStorage) getTaskFromFile(guid uint64) (models.Task, error) {
-	// NOTE: For now, we load everything into memory, so if we don't have a guid
-	// in the buffer, it doesn't exist
-	return models.Task{}, fmt.Errorf("CSV Storage Error: guid not found %d\n", guid)
-}
-
-func (c *CsvStorage) GetTask(guid uint64) (models.Task, error) {
-	if _, ok := c.buffer_guid[guid]; !ok {
-		return c.getTaskFromFile(guid)
-	} else {
-		return *c.buffer_guid[guid], nil
-	}
-}
-
-func (c *CsvStorage) GetByTag(tag string) []uint64 {
-	panic("not implemented")
-}
-
-func (s *CsvStorage) GetByName(name string) []uint64 {
-	result := make([]uint64, len(s.buffer_name[name]))
-	if len(result) == 0 {
-		return nil
-	}
-
-	for i, task := range s.buffer_name[name] {
-		result[i] = task.Guid
-	}
-
-	return result
-}
-
-func (c *CsvStorage) GetAllTasks() []uint64 {
-	// NOTE: For now, we load everything into memory
-	var result []uint64
-	var uuid uint64
-
-	_, err := c.f.Seek(0, 0)
-	if err != nil {
-		fmt.Printf("Error resetting task file: %s\n", err.Error())
-	}
-
-	r := csv.NewReader(c.f)
-
-	for {
-		record, err := r.Read()
-		if err == io.EOF {
-			return result
-		}
-
-		uuid, err = strconv.ParseUint(record[0], 10, 64)
-		if err != nil {
-			// TODO: Log
-			fmt.Printf("Invalid UUID: %s", record[0])
-		}
-
-		result = append(result, uuid)
-	}
-
-	return result
-}
-
-// TODO: This is terrible
-func (c *CsvStorage) writeAll() error {
-
-	if err := c.f.Truncate(0); err != nil {
-		return fmt.Errorf("CsvStorage.writeAll: %s", err)
-	}
-	if _, err := c.f.Seek(0, 0); err != nil {
-		return fmt.Errorf("CsvStorage.writeAll: %s", err)
-	}
-
-	keys := []uint64{}
-	for k, _ := range c.buffer_guid {
-		keys = append(keys, k)
-	}
-
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-
-	for _, k := range keys {
-		if _, err := c.f.WriteString(TaskToCSV(*c.buffer_guid[k])); err != nil {
-			return fmt.Errorf("CsvStorage.writeAll: %s", err)
-		}
-	}
-
-	return nil
-}
-
-func (c *CsvStorage) CreateTask(t models.Task) error {
-	if task, err := c.GetTask(t.Guid); err == nil {
-		return fmt.Errorf("Task with GUID %d already exists:\n\t%s\n", t.Guid, task.Name)
-	}
-
-	c.queue = append(c.queue, t)
-
-	p_t := &c.queue[len(c.queue)-1]
-
-	c.updateBuffers(p_t)
-
-	if err := c.writeAll(); err != nil {
-		return fmt.Errorf("CsvStorage.CreateTask: %s", err.Error())
-	}
-
-	return nil
-}
-
-func (c *CsvStorage) CreateTasks(t []models.Task) []error {
-	panic("not implemented")
 }

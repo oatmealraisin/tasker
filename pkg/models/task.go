@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -54,7 +55,8 @@ func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 
 	termWidth, _, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		panic(err.Error())
+		fmt.Printf("%s\n", err.Error())
+		termWidth = 200
 	}
 
 	// TODO: Modify to start removing columns to fit screen
@@ -176,4 +178,60 @@ func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
 	w.Flush()
 
 	return
+}
+
+func UuidSort(uuids []uint64) {
+	if len(uuids) < 2 {
+		return
+	}
+
+	if len(uuids) < 256 {
+		sort.Slice(uuids, func(i, j int) bool { return uuids[i] < uuids[j] })
+	}
+
+	buffer := make([]uint64, len(uuids))
+
+	// Each pass processes a byte offset, copying back and forth between slices
+	from := uuids
+	to := buffer[:len(uuids)]
+	var key uint8
+	var offset [256]int // Keep track of where groups start
+
+	for keyOffset := uint(0); keyOffset < 64; keyOffset += 8 {
+		keyMask := uint64(0xFF << keyOffset) // Current 'digit' to look at
+		var counts [256]int                  // Keep track of the number of elements for each kind of byte
+		sorted := true                       // Check for already sorted
+		prev := uint64(0)                    // if elem is always >= prev it is already sorted
+		for _, elem := range from {
+			key = uint8((elem & keyMask) >> keyOffset) // fetch the byte at current 'digit'
+			counts[key]++                              // count of elems to put in this digit's bucket
+
+			if sorted { // Detect sorted
+				sorted = elem >= prev
+				prev = elem
+			}
+		}
+
+		if sorted { // Short-circuit sorted
+			if (keyOffset/8)%2 == 1 {
+				copy(to, from)
+			}
+			return
+		}
+
+		// Find target bucket offsets
+		offset[0] = 0
+		for i := 1; i < len(offset); i++ {
+			offset[i] = offset[i-1] + counts[i-1]
+		}
+
+		// Rebucket while copying to other buffer
+		for _, elem := range from {
+			key = uint8((elem & keyMask) >> keyOffset) // Get the digit
+			to[offset[key]] = elem                     // Copy the element to the digit's bucket
+			offset[key]++                              // One less space, move the offset
+		}
+		// On next pass copy data the other way
+		to, from = from, to
+	}
 }

@@ -6,6 +6,12 @@ import (
 	"github.com/oatmealraisin/tasker/pkg/models"
 )
 
+type getZeroGuidError struct{}
+
+func (e getZeroGuidError) Error() string {
+	return "GUID 0 is reserved, cannot get"
+}
+
 type bufferStorage struct {
 	buffer_guid   map[uint64]*models.Task
 	buffer_tag    map[string][]*models.Task
