@@ -8,11 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/oatmealraisin/tasker/pkg/models"
+	"github.com/oatmealraisin/tasker/pkg/util"
 )
 
 type CsvStorage struct {
@@ -78,7 +77,7 @@ func (c *CsvStorage) GetAllTasks() []uint64 {
 
 	_, err := c.f.Seek(0, 0)
 	if err != nil {
-		fmt.Printf("Error resetting task file: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "Error resetting task file: %s\n", err.Error())
 	}
 
 	r := csv.NewReader(c.f)
@@ -91,8 +90,7 @@ func (c *CsvStorage) GetAllTasks() []uint64 {
 
 		uuid, err = strconv.ParseUint(record[0], 10, 64)
 		if err != nil {
-			// TODO: Log
-			fmt.Printf("Invalid UUID: %s", record[0])
+			fmt.Fprintf(os.Stderr, "Invalid UUID: %s", record[0])
 		}
 
 		result = append(result, uuid)
@@ -154,7 +152,7 @@ func (s *CsvStorage) loadTasks(num int) {
 		record, err := r.Read()
 		if err != nil {
 			if err != io.EOF {
-				fmt.Printf("Error reading CSV Storage: %s", err.Error())
+				fmt.Fprintf(os.Stderr, "Error reading CSV Storage: %s", err.Error())
 			}
 
 			return
@@ -162,7 +160,7 @@ func (s *CsvStorage) loadTasks(num int) {
 
 		newTask, err := TaskFromCsv(record)
 		if err != nil {
-			fmt.Printf("Error extracting task from CSV record: %s", err.Error())
+			fmt.Fprintf(os.Stderr, "Error extracting task from CSV record: %s", err.Error())
 			continue
 		}
 
@@ -223,20 +221,9 @@ func TaskToCSV(task models.Task) string {
 		}
 	}
 
-	var added string
-	if time_added, err := ptypes.Timestamp(task.Added); err == nil {
-		added = time_added.Format("2006-01-02")
-	}
-
-	var finished string
-	if time_finished, err := ptypes.Timestamp(task.Finished); err == nil {
-		finished = time_finished.Format("2006-01-02")
-	}
-
-	var due string
-	if time_due, err := ptypes.Timestamp(task.Due); err == nil {
-		due = time_due.Format("2006-01-02")
-	}
+	added := util.TimestampToString(task.Added)
+	finished := util.TimestampToString(task.Finished)
+	due := util.TimestampToString(task.Due)
 
 	result := fmt.Sprintf("%d,%s,%d,%s,%s,%s,%t,%t,%s,%d,%s,%d,%s,%s\n",
 		task.Guid,
@@ -279,44 +266,19 @@ func TaskFromCsv(record []string) (models.Task, error) {
 		}
 	}
 
-	tAdded, err := time.Parse("2006-01-02", record[3])
-	if err != nil {
-		return newTask, err
+	added := util.StringToTimestamp(record[3])
+	if added == nil {
+		return newTask, fmt.Errorf("Unable to parse timestamp: %s\n", record[3])
 	}
 
-	added, err := ptypes.TimestampProto(tAdded)
-	if err != nil {
-		return newTask, err
+	finished := util.StringToTimestamp(record[4])
+	if record[4] != "" && finished == nil {
+		return newTask, fmt.Errorf("Unable to parse timestamp: %s\n", record[5])
 	}
 
-	var finished *timestamp.Timestamp
-	if record[4] != "" {
-		tFinished, err := time.Parse("2006-01-02", record[4])
-		if err != nil {
-			return newTask, err
-		}
-
-		finished, err = ptypes.TimestampProto(tFinished)
-		if err != nil {
-			return newTask, err
-		}
-	} else {
-		finished = nil
-	}
-
-	var due *timestamp.Timestamp
-	if record[5] != "" {
-		tDue, err := time.Parse("2006-01-02", record[5])
-		if err != nil {
-			return newTask, err
-		}
-
-		due, err = ptypes.TimestampProto(tDue)
-		if err != nil {
-			return newTask, err
-		}
-	} else {
-		due = nil
+	due := util.StringToTimestamp(record[5])
+	if record[5] != "" && due == nil {
+		return newTask, fmt.Errorf("Unable to parse timestamp: %s\n", record[5])
 	}
 
 	removed, err := strconv.ParseBool(record[6])
