@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"math"
+	"os"
 	"sort"
 	"time"
 
@@ -17,7 +17,6 @@ var (
 	numShow      int
 )
 
-// addCmd represents the add command
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Get the current to do list",
@@ -38,7 +37,7 @@ func init() {
 }
 
 func status(cmd *cobra.Command, args []string) error {
-	if err := status_validate(cmd, args); err != nil {
+	if err := statusValidate(cmd, args); err != nil {
 		return err
 	}
 
@@ -52,15 +51,17 @@ func status(cmd *cobra.Command, args []string) error {
 	sort.Slice(tasks, func(i, j int) bool {
 		a, err := db.GetTask(tasks[i])
 		if err != nil {
+			fmt.Println("Error: Couldn't get Task %d: %s", tasks[i], err.Error())
 			return false
 		}
 
 		b, err := db.GetTask(tasks[j])
 		if err != nil {
+			fmt.Println("Error: Couldn't get Task %d: %s", tasks[j], err.Error())
 			return true
 		}
 
-		return calc_task_score(a) > calc_task_score(b)
+		return a.Score() > b.Score()
 	})
 
 	var selected []uint64
@@ -73,8 +74,7 @@ func status(cmd *cobra.Command, args []string) error {
 
 		task, err := db.GetTask(uuid)
 		if err != nil {
-			// TODO: Log
-			fmt.Println("Could get get Task %d\n", uuid)
+			fmt.Fprintf(os.Stderr, "Could get get Task %d\n", uuid)
 			continue
 		}
 
@@ -90,8 +90,6 @@ func status(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// TODO: Implement subtasks
-		// TODO: Implement dependencies
 		if !task.Removed && task.Size != 0 {
 			if len(task.Dependencies) != 0 {
 				for _, j := range task.Dependencies {
@@ -114,36 +112,7 @@ func status(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func status_validate(cmd *cobra.Command, args []string) error {
+func statusValidate(cmd *cobra.Command, args []string) error {
 	// TODO: Implement
 	return nil
-}
-
-func calc_task_score(task models.Task) float64 {
-	add_time, err := ptypes.Timestamp(task.Added)
-	if err != nil {
-		return 0.0
-	}
-
-	due_mod := 0.0
-	if task.Due != nil {
-		due_time, err := ptypes.Timestamp(task.Due)
-		if err != nil {
-			return 0.0
-		}
-
-		due_mod = 24.0 / math.Exp(time.Until(due_time).Hours())
-	}
-
-	add_mod := math.Max(1.0, math.Log(time.Since(add_time).Hours()/24.0))
-
-	// TODO: Size and priority have a special relationship.. You want to do the
-	// smallest, most important tasks first, followed by the hardest, most
-	// important tasks. Change the formula to reflect this
-	// TODO: Also, the age kind of changes the priority.. or at least makes the
-	// priority less important. Should also change the formula to reflect this
-	priority_mod := math.Pow(3.0, float64(task.Priority)) * 0.075
-	size_mod := 0.5 * float64(task.Size)
-
-	return due_mod + add_mod/(priority_mod+size_mod)
 }
