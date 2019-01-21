@@ -76,9 +76,9 @@ func (task Task) stringify() map[string]string {
 			} else if num_days < 2.0 {
 				result["due"] = "Tmrw"
 			} else if num_days < 30.0 {
-				result["due"] = fmt.Sprintf("%dd", num_days)
+				result["due"] = fmt.Sprintf("%dd", int(num_days))
 			} else if num_days < 360.0 {
-				result["due"] = fmt.Sprintf("%dm", num_days/30)
+				result["due"] = fmt.Sprintf("%dm", int(num_days/30))
 			} else {
 				result["due"] = ">1y"
 			}
