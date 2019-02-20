@@ -91,3 +91,15 @@ func (b *bufferStorage) DeleteTask(guid uint64) error {
 
 	return nil
 }
+
+func (b *bufferStorage) GetAllTags() []string {
+	result := make([]string, len(b.buffer_tag))
+
+	i := 0
+	for k := range b.buffer_tag {
+		result[i] = k
+		i++
+	}
+
+	return result
+}
