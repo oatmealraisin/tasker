@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/oatmealraisin/tasker/pkg/models"
 )
@@ -99,6 +100,21 @@ func (b *bufferStorage) GetAllTags() []string {
 	for k := range b.buffer_tag {
 		result[i] = k
 		i++
+	}
+
+	return result
+}
+
+func (b *bufferStorage) GetByTags(tags []string) []uint64 {
+	result := []uint64{}
+	for _, tag := range tags {
+		if tasks, ok := b.buffer_tag[tag]; ok {
+			for _, task := range tasks {
+				result = append(result, task.Guid)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Could not find tasks with tag '%s'\n", tag)
+		}
 	}
 
 	return result
