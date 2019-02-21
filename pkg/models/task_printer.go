@@ -47,6 +47,10 @@ func getTermWidth() int {
 // PrintTasks is shorthand for creating a TaskTree from a list of UUIDs, then
 // printing the tree.
 func PrintTasks(tasks []uint64, get func(uuid uint64) (Task, error)) {
+	if len(tasks) == 0 {
+		return
+	}
+
 	tt := CreateTaskTree(tasks, get)
 	if tt == nil {
 		fmt.Fprintf(os.Stderr, "Error creating task tree\n")
