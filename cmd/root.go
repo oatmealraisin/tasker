@@ -24,6 +24,8 @@ var TaskerCmd = &cobra.Command{
 	Use:   "tasker",
 	Short: "A pluggable task server for keeping track of all those To Do's",
 	Long:  ``,
+	Run:   statusCmd.Run,
+	RunE:  status,
 }
 
 // Execute adds all child commands to the root command and sets flags
