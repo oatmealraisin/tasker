@@ -7,6 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var tagFlags struct {
+	list bool
+}
+
 // tagCmd represents the get command
 var tagCmd = &cobra.Command{
 	Use:   "tag",
@@ -27,12 +31,20 @@ to quickly create a Cobra application.`,
 
 func init() {
 	TaskerCmd.AddCommand(tagCmd)
+
+	tagCmd.Flags().BoolVarP(&tagFlags.list, "list", "l", false, "List all tags in use.")
 }
 
 func tag(cmd *cobra.Command, args []string) error {
-	tags := db.GetAllTags()
-	for _, tag := range tags {
-		fmt.Printf("%s, ", tag)
+	// If no options specified, and no target/tag pair, just list
+	if tagFlags.list == true || len(args) == 0 {
+
+		tags := db.GetAllTags()
+		for _, tag := range tags {
+			fmt.Printf("%s, ", tag)
+		}
+
+		return nil
 	}
 
 	return nil
