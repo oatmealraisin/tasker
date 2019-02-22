@@ -22,6 +22,7 @@ var getFlags struct {
 	tagsOpt         []string
 	includeFinished bool
 	dueBefore       string
+	url             bool
 }
 
 // getCmd represents the get command, mostly Cobra boilerplate
@@ -53,6 +54,7 @@ func init() {
 	getCmd.Flags().StringSliceVar(&getFlags.tagsOpt, "has-tag", []string{}, "Get tasks from a tag. Can be invoked more than once to specify multiple tags.")
 	getCmd.Flags().Uint64VarP(&getFlags.uuid, "uuid", "u", 0, "Get tasks with matching uuid. Will only return one task.")
 	getCmd.Flags().BoolVar(&getFlags.includeFinished, "include-finished", false, "Also give tasks that have been finished.")
+	getCmd.Flags().BoolVar(&getFlags.url, "url", false, "Print the URL associated with the task.")
 	getCmd.Flags().StringVar(&getFlags.dueBefore, "due-before", "", "Only show tasks due before a certain date.")
 }
 
@@ -112,7 +114,19 @@ func get(cmd *cobra.Command, args []string) error {
 		models.NoUnfinishedPrereqs,
 	}.Apply(tasks, db.GetTask)
 
-	models.PrintTasks(tasks, db.GetTask)
+	if getFlags.url {
+		for _, uuid := range tasks {
+			task, err := db.GetTask(uuid)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not get task %d.\n%s", uuid, err.Error())
+				continue
+			}
+
+			fmt.Printf("%s\n", task.Url)
+		}
+	} else {
+		models.PrintTasks(tasks, db.GetTask)
+	}
 
 	return nil
 }
