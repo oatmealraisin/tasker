@@ -122,7 +122,9 @@ func get(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			fmt.Printf("%s\n", task.Url)
+			if task.Url != "" {
+				fmt.Printf("%s\n", task.Url)
+			}
 		}
 	} else {
 		models.PrintTasks(tasks, db.GetTask)
