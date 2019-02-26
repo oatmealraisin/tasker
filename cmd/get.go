@@ -111,7 +111,6 @@ func get(cmd *cobra.Command, args []string) error {
 	tasks = models.FilterList{
 		models.IsNotFinishedFilter,
 		models.IsNotRemovedFilter,
-		models.NoUnfinishedPrereqs,
 	}.Apply(tasks, db.GetTask)
 
 	if getFlags.url {
