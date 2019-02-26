@@ -37,7 +37,7 @@ var (
 func getTermWidth() int {
 	result, _, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		fmt.Printf("%s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		return 200
 	}
 

@@ -80,13 +80,13 @@ func initConfig() {
 	case "postgres":
 		panic("postgres not implemented")
 	default:
-		fmt.Printf("Unknown database type: %s", viper.GetString("StorageType"))
+		fmt.Fprintf(os.Stderr, "Unknown database type: %s", viper.GetString("StorageType"))
 	}
 
 	var err error
 	termWidth, termHeight, err = terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		fmt.Printf("%s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		termWidth = 200
 	}
 }
