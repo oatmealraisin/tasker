@@ -12,10 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+var statusFlags struct {
 	showFinished bool
 	numShow      int
-)
+	tags         []string
+}
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -32,8 +33,9 @@ var statusCmd = &cobra.Command{
 func init() {
 	TaskerCmd.AddCommand(statusCmd)
 
-	statusCmd.Flags().BoolVarP(&showFinished, "finished", "f", false, "Display even finished tasks.")
-	statusCmd.Flags().IntVarP(&numShow, "number", "n", 10, "Number of tasks to display.")
+	statusCmd.Flags().BoolVarP(&statusFlags.showFinished, "finished", "f", false, "Display even finished tasks.")
+	statusCmd.Flags().IntVarP(&statusFlags.numShow, "number", "n", 10, "Number of tasks to display.")
+	statusCmd.Flags().StringSliceVarP(&statusFlags.tags, "tag", "t", []string{}, "Give the status of tag or multiple tags.")
 }
 
 func status(cmd *cobra.Command, args []string) error {
@@ -41,8 +43,14 @@ func status(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// TODO: Find a way to go through only some of the tasks.. not all
-	tasks := db.GetAllTasks()
+	tasks := []uint64{}
+
+	if len(statusFlags.tags) > 0 {
+		tasks = db.GetByTags(statusFlags.tags)
+	} else {
+		tasks = db.GetAllTasks()
+	}
+
 	if len(tasks) == 0 {
 		fmt.Println("It doesn't look like you have anything to do!")
 		return nil
@@ -68,7 +76,7 @@ func status(cmd *cobra.Command, args []string) error {
 
 	i := 0
 	for _, uuid := range tasks {
-		if i >= numShow {
+		if i >= statusFlags.numShow {
 			break
 		}
 
