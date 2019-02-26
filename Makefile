@@ -6,5 +6,8 @@ proto:
 release:
 	go build tasker.go
 
+install:
+	go install github.com/oatmealraisin/tasker
+
 
 .PHONY: proto release all
