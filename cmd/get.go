@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/oatmealraisin/tasker/pkg/models"
@@ -17,6 +18,7 @@ var getFlags struct {
 	alsoParents   bool
 	alsoRelatives bool
 
+	getAll          bool
 	uuid            uint64
 	tags            []string
 	tagsOpt         []string
@@ -65,24 +67,22 @@ func get(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(args) > 0 {
-		if args[0] == "all" {
-			allTasks := db.GetAllTasks()
-			tasks = allTasks[:0]
+	if getFlags.getAll {
+		allTasks := db.GetAllTasks()
+		tasks = allTasks[:0]
 
-			for _, u := range allTasks {
-				if task, err := db.GetTask(u); err == nil {
-					if !task.Removed && task.Added.Seconds < time.Now().Unix() {
-						tasks = append(tasks, u)
-					}
-				} else {
-					fmt.Fprintf(os.Stderr, err.Error())
+		for _, u := range allTasks {
+			if task, err := db.GetTask(u); err == nil {
+				if !task.Removed && task.Added.Seconds < time.Now().Unix() {
+					tasks = append(tasks, u)
 				}
+			} else {
+				fmt.Fprintf(os.Stderr, err.Error())
 			}
 		}
 	}
 
-	if cmd.Flag("uuid").Changed {
+	if getFlags.uuid != 0 {
 		_, err := db.GetTask(getFlags.uuid)
 		if err != nil {
 			return err
@@ -146,9 +146,16 @@ func validateGet(cmd *cobra.Command, args []string) error {
 		getFlags.includeFinished = true
 	}
 
-	if len(args) == 1 && args[0] == "all" {
-		if len(getFlags.tags)+len(getFlags.tagsOpt) != 0 {
-			return fmt.Errorf("All means all! Specify tag filters without 'all'\n")
+	if len(args) == 1 {
+		if args[0] == "all" {
+			if len(getFlags.tags)+len(getFlags.tagsOpt) != 0 {
+				return fmt.Errorf("All means all! Specify tag filters without 'all'\n")
+			}
+
+			getFlags.getAll = true
+		} else if uuid, err := strconv.ParseUint(args[0], 10, 64); err == nil {
+			getFlags.uuid = uuid
+			getFlags.includeFinished = true
 		}
 	}
 
