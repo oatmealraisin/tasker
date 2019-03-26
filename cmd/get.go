@@ -111,7 +111,7 @@ func get(cmd *cobra.Command, args []string) error {
 	filterList := models.FilterList{}
 
 	if !getFlags.includeFinished {
-		filterList = append(filterList, models.IsNotFinishedFilter)
+		filterList = append(filterList, models.IsNotFinishedFilter())
 	}
 
 	tasks = filterList.Apply(tasks, db.GetTask)

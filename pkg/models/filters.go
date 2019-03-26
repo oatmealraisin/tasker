@@ -3,64 +3,171 @@ package models
 import (
 	"fmt"
 	"os"
+	"time"
+
+	"github.com/golang/protobuf/ptypes"
+	"github.com/spf13/viper"
 )
 
-type Filter func(task Task, get func(uuid uint64) (Task, error)) bool
+type Filter struct {
+	Apply func(task Task, get func(uuid uint64) (Task, error)) bool
 
-func IsFinishedFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return task.Finished != nil
+	opt bool
 }
 
-func IsNotFinishedFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return task.Finished == nil
+func (f Filter) NotOpt() Filter {
+	f.opt = false
+
+	return f
 }
 
-func IsRemovedFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return task.Removed
+func (f Filter) Opt() Filter {
+	f.opt = true
+
+	return f
 }
 
-func IsNotRemovedFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return !task.Removed
-}
-
-func HasDueDateFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return task.Due != nil
-}
-
-func DoesNotHaveDueDateFilter(task Task, get func(uuid uint64) (Task, error)) bool {
-	return task.Due == nil
-}
-
-func NoUnfinishedPrereqs(task Task, get func(uuid uint64) (Task, error)) bool {
-	for _, uuid := range task.Dependencies {
-		prereq, err := get(uuid)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could not get task %d\n", uuid)
-			return false
-		}
-
-		if prereq.Finished == nil {
-			return false
-		}
+func IsFinishedFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Finished != nil
 	}
 
-	return true
+	return result
 }
 
-func UnfinishedPrereqs(task Task, get func(uuid uint64) (Task, error)) bool {
-	for _, uuid := range task.Dependencies {
-		prereq, err := get(uuid)
+func IsNotFinishedFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Finished == nil
+	}
+
+	return
+}
+
+func IsRemovedFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Removed
+	}
+
+	return result
+}
+
+func IsNotRemovedFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return !task.Removed
+	}
+
+	return result
+}
+
+func HasDueDateFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Due != nil
+	}
+
+	return result
+}
+
+func DoesNotHaveDueDateFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Due == nil
+	}
+
+	return result
+}
+
+func IsStale() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		add_time, err := ptypes.Timestamp(task.Added)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could not get task %d\n", uuid)
 			return false
 		}
 
-		if prereq.Finished == nil {
-			return true
-		}
+		return time.Since(add_time).Hours() >= float64(viper.GetInt("StaleTime"))
 	}
 
-	return false
+	return result
+}
+
+func IsNotStale() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return !IsStale().Apply(task, get)
+	}
+
+	return result
+}
+
+func NoUnfinishedPrereqs() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		for _, uuid := range task.Dependencies {
+			prereq, err := get(uuid)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not get task %d\n", uuid)
+				return false
+			}
+
+			if prereq.Finished == nil {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return result
+}
+
+func UnfinishedPrereqs() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		for _, uuid := range task.Dependencies {
+			prereq, err := get(uuid)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not get task %d\n", uuid)
+				return false
+			}
+
+			if prereq.Finished == nil {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	return result
+}
+
+func IsActiveFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		add_time, err := ptypes.Timestamp(task.Added)
+		return err == nil && !add_time.After(time.Now())
+	}
+
+	return result
+}
+
+func IsNotActiveFilter() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		add_time, err := ptypes.Timestamp(task.Added)
+		return err != nil || add_time.After(time.Now())
+	}
+
+	return result
+}
+
+func SizeIsExactly(size uint32) (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Size == size
+	}
+
+	return result
+}
+
+func SizeIsNot(size uint32) (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Size != size
+	}
+
+	return result
 }
 
 type FilterList []Filter
@@ -77,7 +184,7 @@ func (f FilterList) Apply(uuids []uint64, get func(uuid uint64) (Task, error)) [
 		}
 
 		for _, filter := range f {
-			if !filter(task, get) {
+			if !filter.Apply(task, get) {
 				goto reject
 			}
 		}
