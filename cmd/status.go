@@ -5,19 +5,19 @@ import (
 	"log"
 	"os"
 	"sort"
-	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/oatmealraisin/tasker/pkg/models"
 	"github.com/spf13/cobra"
 )
 
+// statusFlags isolates the flags specific to `tasker status`
 var statusFlags struct {
 	showFinished bool
 	numShow      int
 	tags         []string
 }
 
+// statusCmd is the cobra command for `tasker status`
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Get the current to do list",
@@ -30,6 +30,7 @@ var statusCmd = &cobra.Command{
 	RunE: status,
 }
 
+// Add `tasker status` to the command list, add `tasker status` flags
 func init() {
 	TaskerCmd.AddCommand(statusCmd)
 
@@ -38,8 +39,13 @@ func init() {
 	statusCmd.Flags().StringSliceVarP(&statusFlags.tags, "tag", "t", []string{}, "Give the status of tag or multiple tags.")
 }
 
+// status is the main function for the `tasker status` command. First we get the
+// tasklist we're using for context (All by default, but could be within a list
+// of tags). Then, we filter by IsNotFinished, IsNotRemoved. Finally, we sort
+// by their score and print the first 10.
 func status(cmd *cobra.Command, args []string) error {
-	if err := statusValidate(cmd, args); err != nil {
+	var err error
+	if err = statusValidate(cmd, args); err != nil {
 		return err
 	}
 
@@ -52,74 +58,43 @@ func status(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(tasks) == 0 {
-		fmt.Println("It doesn't look like you have anything to do!")
+		fmt.Printf("It doesn't look like you have anything to do!\n")
 		return nil
 	}
+
+	filterList := models.FilterList{
+		models.IsNotFinishedFilter(),
+		models.IsNotRemovedFilter(),
+		models.IsActiveFilter(),
+		models.SizeIsNot(0),
+		models.NoUnfinishedPrereqs(),
+	}
+
+	tasks = filterList.Apply(tasks, db.GetTask)
 
 	sort.Slice(tasks, func(i, j int) bool {
 		a, err := db.GetTask(tasks[i])
 		if err != nil {
-			fmt.Println("Error: Couldn't get Task %d: %s", tasks[i], err.Error())
+			fmt.Fprintf(os.Stderr, "Error sorting task %d: %s\n", tasks[i], err.Error())
 			return false
 		}
 
 		b, err := db.GetTask(tasks[j])
 		if err != nil {
-			fmt.Println("Error: Couldn't get Task %d: %s", tasks[j], err.Error())
+			fmt.Fprintf(os.Stderr, "Error sorting task %d: %s\n", tasks[j], err.Error())
 			return true
 		}
 
 		return a.Score() > b.Score()
 	})
 
-	var selected []uint64
+	models.PrintTasks(tasks[:statusFlags.numShow], db.GetTask)
 
-	i := 0
-	for _, uuid := range tasks {
-		if i >= statusFlags.numShow {
-			break
-		}
-
-		task, err := db.GetTask(uuid)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Could get get Task %d\n", uuid)
-			continue
-		}
-
-		add_time, err := ptypes.Timestamp(task.Added)
-
-		// Don't show tasks that are added in the future
-		if err == nil && add_time.After(time.Now()) {
-			y, m, d := add_time.Date()
-			y_n, m_n, d_n := time.Now().Date()
-
-			if !(y <= y_n && m <= m_n && d <= d_n) {
-				continue
-			}
-		}
-
-		if !task.Removed && task.Size != 0 {
-			if len(task.Dependencies) != 0 {
-				for _, j := range task.Dependencies {
-					dep, err := db.GetTask(j)
-					// Don't show a task if it has an unfinished dependency
-					if err == nil && !dep.Removed {
-						goto cont
-					}
-				}
-			}
-
-			// Confirm for selection, we can't fail after this
-			selected = append(selected, task.Guid)
-			i++
-		}
-	cont:
-	}
-
-	models.PrintTasks(selected, db.GetTask)
 	return nil
 }
 
+// statusValidate checks the flags and arguments for `tasker status` for errors
+// or contradictions. It fills out anything left out.
 func statusValidate(cmd *cobra.Command, args []string) error {
 	// TODO: Implement
 	return nil
