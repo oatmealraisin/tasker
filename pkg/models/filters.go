@@ -170,6 +170,22 @@ func SizeIsNot(size uint32) (result Filter) {
 	return result
 }
 
+func HasParent() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return task.Parent != 0
+	}
+
+	return result
+}
+
+func HasChildren() (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		return len(task.Subtasks) != 0
+	}
+
+	return result
+}
+
 type FilterList []Filter
 
 // Apply returns a subset of `uuids` that pass through all the filters in the
