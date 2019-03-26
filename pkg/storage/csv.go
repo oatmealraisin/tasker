@@ -63,8 +63,8 @@ func (s *CsvStorage) GetByName(name string) []uint64 {
 		return nil
 	}
 
-	for i, task := range s.buffer_name[name] {
-		result[i] = task.Guid
+	for i, uuid := range s.buffer_name[name] {
+		result[i] = uuid
 	}
 
 	return result
@@ -129,6 +129,15 @@ func (c *CsvStorage) CreateTask(t models.Task) error {
 
 func (c *CsvStorage) CreateTasks(t []models.Task) []error {
 	panic("not implemented")
+}
+
+func (s *CsvStorage) EditTask(oldTask, newTask models.Task) error {
+	err := s.bufferStorage.EditTask(oldTask, newTask)
+	if err != nil {
+		return err
+	}
+
+	return s.writeAll()
 }
 
 // TODO: This is terrible

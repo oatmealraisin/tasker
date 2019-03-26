@@ -10,6 +10,9 @@ import (
 type Storage interface {
 	CreateTask(t models.Task) error
 	CreateTasks(t []models.Task) []error
+
+	EditTask(oldTask, newTask models.Task) error
+
 	GetTask(guid uint64) (models.Task, error)
 
 	// GetByTag returns all Tasks with a given tag.
