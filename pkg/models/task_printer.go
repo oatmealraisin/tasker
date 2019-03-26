@@ -103,14 +103,32 @@ func (task Task) stringify() map[string]string {
 		}
 	}
 
+	result["name"] = task.Name
+	if task.Finished != nil {
+		result["finished"] = "?"
+		result["name"] = fmt.Sprintf("\x1B[9m%s\x1B[0m", result["name"])
+
+		if time_finished, err := ptypes.Timestamp(task.Finished); err == nil {
+			num_days := int(math.Floor(time.Since(time_finished).Hours() / 24.0))
+			if num_days == 0 {
+				result["finished"] = "Today"
+			} else if num_days < 30 {
+				result["finished"] = fmt.Sprintf("%dd ago", num_days)
+			} else if num_days < 360 {
+				result["finished"] = fmt.Sprintf("%dm ago", num_days/30)
+			} else {
+				result["finished"] = ">1y ago"
+			}
+		}
+	}
+
 	result["url"] = ""
 	if task.Url != "" {
 		result["url"] = "(+)"
 	}
+
 	if viper.GetBool("debug") {
-		result["name"] = fmt.Sprintf("%d %s", task.Guid, task.Name)
-	} else {
-		result["name"] = task.Name
+		result["name"] = fmt.Sprintf("%d %s", task.Guid, result["name"])
 	}
 
 	result["tags"] = strings.Join(task.Tags, "|")

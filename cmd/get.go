@@ -108,10 +108,13 @@ func get(cmd *cobra.Command, args []string) error {
 		tasks = children
 	}
 
-	tasks = models.FilterList{
-		models.IsNotFinishedFilter,
-		models.IsNotRemovedFilter,
-	}.Apply(tasks, db.GetTask)
+	filterList := models.FilterList{}
+
+	if !getFlags.includeFinished {
+		filterList = append(filterList, models.IsNotFinishedFilter)
+	}
+
+	tasks = filterList.Apply(tasks, db.GetTask)
 
 	if getFlags.url {
 		for _, uuid := range tasks {
@@ -139,6 +142,8 @@ func validateGet(cmd *cobra.Command, args []string) error {
 		if len(getFlags.tags)+len(args)+len(getFlags.tagsOpt) != 0 || cmd.Flag("include-finished").Changed {
 			return fmt.Errorf("Cannot specify multiple filters if UUID is given.\n")
 		}
+
+		getFlags.includeFinished = true
 	}
 
 	if len(args) == 1 && args[0] == "all" {

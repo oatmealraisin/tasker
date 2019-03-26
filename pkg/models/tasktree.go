@@ -3,7 +3,8 @@ package models
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
+
+	"github.com/oatmealraisin/tasker/pkg/gui/terminal"
 )
 
 // TaskTree is a data structure for navigating the parent/child relationship of
@@ -78,7 +79,7 @@ func (tt *TaskTree) recurseInsert(uuid uint64, get func(uuid uint64) (Task, erro
 // Print displays the contents of the tree up to the third level. Anything
 // further will be displayed with ellipses.
 func (tt *TaskTree) Print(get func(uuid uint64) (Task, error)) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
+	w := terminal.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 
 	printColumns(w)
 
