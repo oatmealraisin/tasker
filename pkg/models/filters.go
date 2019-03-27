@@ -186,6 +186,19 @@ func HasChildren() (result Filter) {
 	return result
 }
 
+func CreatedAfter(date time.Time) (result Filter) {
+	result.Apply = func(task Task, get func(uuid uint64) (Task, error)) bool {
+		added, err := ptypes.Timestamp(task.Added)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting add date of Task %d (%s): %s", task.Guid, task.Name, err.Error())
+		}
+
+		return added.After(date)
+	}
+
+	return result
+}
+
 type FilterList []Filter
 
 // Apply returns a subset of `uuids` that pass through all the filters in the

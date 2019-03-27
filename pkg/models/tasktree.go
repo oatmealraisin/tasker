@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/oatmealraisin/tasker/pkg/gui/terminal"
 )
@@ -83,8 +84,17 @@ func (tt *TaskTree) Print(get func(uuid uint64) (Task, error)) {
 
 	printColumns(w)
 
-	for _, root := range tt.nodes {
-		task, err := get(root.key)
+	roots := make([]uint64, len(tt.nodes))
+	i := 0
+	for k := range tt.nodes {
+		roots[i] = k
+		i++
+	}
+	sort.Slice(roots, func(i, j int) bool { return roots[i] < roots[j] })
+
+	for _, key := range roots {
+		root := tt.nodes[key]
+		task, err := get(key)
 		if err != nil {
 			// TODO: Log
 			fmt.Println("Could not get task %d: %s\n", root.key, err.Error())
@@ -93,9 +103,18 @@ func (tt *TaskTree) Print(get func(uuid uint64) (Task, error)) {
 
 		printStringyTask(w, task.stringify())
 
+		subs := make([]uint64, len(root.nodes))
 		i := 0
-		for _, sub := range root.nodes {
-			subTask, err := get(sub.key)
+		for k := range root.nodes {
+			subs[i] = k
+			i++
+		}
+		sort.Slice(subs, func(i, j int) bool { return subs[i] < subs[j] })
+
+		i = 0
+		for _, skey := range subs {
+			sub := root.nodes[skey]
+			subTask, err := get(skey)
 			// TODO: Log
 			if err != nil {
 				fmt.Println("Could not get task %d: %s\n", sub.key, err.Error())
@@ -112,8 +131,18 @@ func (tt *TaskTree) Print(get func(uuid uint64) (Task, error)) {
 				}
 
 				printStringyTask(w, sfyTask)
+
+				leaves := make([]uint64, len(sub.nodes))
 				j := 0
-				for _, leaf := range sub.nodes {
+				for k := range sub.nodes {
+					leaves[j] = k
+					j++
+				}
+				sort.Slice(leaves, func(i, j int) bool { return leaves[i] < leaves[j] })
+
+				j = 0
+				for _, lkey := range leaves {
+					leaf := sub.nodes[lkey]
 					if len(leaf.nodes) != 0 {
 						// TODO: Supersubs
 					}

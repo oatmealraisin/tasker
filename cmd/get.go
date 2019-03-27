@@ -24,6 +24,8 @@ var getFlags struct {
 	tagsOpt         []string
 	includeFinished bool
 	dueBefore       string
+	createdAfter    string
+	tCreatedAfter   time.Time
 	url             bool
 }
 
@@ -58,6 +60,7 @@ func init() {
 	getCmd.Flags().BoolVar(&getFlags.includeFinished, "include-finished", false, "Also give tasks that have been finished.")
 	getCmd.Flags().BoolVar(&getFlags.url, "url", false, "Print the URL associated with the task.")
 	getCmd.Flags().StringVar(&getFlags.dueBefore, "due-before", "", "Only show tasks due before a certain date.")
+	getCmd.Flags().StringVar(&getFlags.createdAfter, "created-after", "", "Only show tasks created after a certain date.")
 }
 
 func get(cmd *cobra.Command, args []string) error {
@@ -114,6 +117,10 @@ func get(cmd *cobra.Command, args []string) error {
 		filterList = append(filterList, models.IsNotFinishedFilter())
 	}
 
+	if getFlags.createdAfter != "" {
+		filterList = append(filterList, models.CreatedAfter(getFlags.tCreatedAfter))
+	}
+
 	tasks = filterList.Apply(tasks, db.GetTask)
 
 	if getFlags.url {
@@ -138,12 +145,21 @@ func get(cmd *cobra.Command, args []string) error {
 // validate checks to make sure there aren't any contradictions or out of bound
 // fields in the invocation.
 func validateGet(cmd *cobra.Command, args []string) error {
+	var err error
+
 	if cmd.Flag("uuid").Changed {
-		if len(getFlags.tags)+len(args)+len(getFlags.tagsOpt) != 0 || cmd.Flag("include-finished").Changed {
+		if len(getFlags.createdAfter)+len(getFlags.tags)+len(args)+len(getFlags.tagsOpt) != 0 || cmd.Flag("include-finished").Changed {
 			return fmt.Errorf("Cannot specify multiple filters if UUID is given.\n")
 		}
 
 		getFlags.includeFinished = true
+	}
+
+	if getFlags.createdAfter != "" {
+		getFlags.tCreatedAfter, err = time.Parse("2006-01-02", getFlags.createdAfter)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(args) == 1 {
