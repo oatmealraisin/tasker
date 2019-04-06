@@ -94,89 +94,67 @@ func (tt *TaskTree) Print(get func(uuid uint64) (Task, error)) {
 
 	for _, key := range roots {
 		root := tt.nodes[key]
-		task, err := get(key)
-		if err != nil {
-			// TODO: Log
-			fmt.Println("Could not get task %d: %s\n", root.key, err.Error())
-			return
-		}
-
-		printStringyTask(w, task.stringify())
-
-		subs := make([]uint64, len(root.nodes))
-		i := 0
-		for k := range root.nodes {
-			subs[i] = k
-			i++
-		}
-		sort.Slice(subs, func(i, j int) bool { return subs[i] < subs[j] })
-
-		i = 0
-		for _, skey := range subs {
-			sub := root.nodes[skey]
-			subTask, err := get(skey)
-			// TODO: Log
-			if err != nil {
-				fmt.Println("Could not get task %d: %s\n", sub.key, err.Error())
-			}
-
-			sfyTask := subTask.stringify()
-			if len(sub.nodes) > 0 {
-				prefix := " "
-				if len(root.nodes) > 1 && len(root.nodes) != i+1 {
-					sfyTask["name"] = fmt.Sprintf("├┬─> %s", sfyTask["name"])
-					prefix = "│"
-				} else {
-					sfyTask["name"] = fmt.Sprintf("└┬─> %s", sfyTask["name"])
-				}
-
-				printStringyTask(w, sfyTask)
-
-				leaves := make([]uint64, len(sub.nodes))
-				j := 0
-				for k := range sub.nodes {
-					leaves[j] = k
-					j++
-				}
-				sort.Slice(leaves, func(i, j int) bool { return leaves[i] < leaves[j] })
-
-				j = 0
-				for _, lkey := range leaves {
-					leaf := sub.nodes[lkey]
-					if len(leaf.nodes) != 0 {
-						// TODO: Supersubs
-					}
-
-					leafTask, err := get(leaf.key)
-					// TODO: Log
-					if err != nil {
-						fmt.Println("Could not get task %d: %s\n", leaf.key, err.Error())
-					}
-
-					sfyTask = leafTask.stringify()
-
-					if len(sub.nodes) > 1 && len(sub.nodes) != j+1 {
-						sfyTask["name"] = fmt.Sprintf("%s├──> %s", prefix, sfyTask["name"])
-					} else {
-						sfyTask["name"] = fmt.Sprintf("%s└──> %s", prefix, sfyTask["name"])
-					}
-
-					printStringyTask(w, sfyTask)
-					j++
-				}
-			} else {
-				if len(root.nodes) > 1 && len(root.nodes) != i+1 {
-					sfyTask["name"] = fmt.Sprintf("├──> %s", sfyTask["name"])
-				} else {
-					sfyTask["name"] = fmt.Sprintf("└──> %s", sfyTask["name"])
-				}
-
-				printStringyTask(w, sfyTask)
-			}
-
-			i++
-		}
+		root._print([]rune{}, w, get)
 	}
 
 	w.Flush()
+}
+
+func (tt *TaskTree) _print(prefix []rune, w *terminal.Writer, get func(uuid uint64) (Task, error)) {
+	// Start with printing the root task
+	task, err := get(tt.key)
+	if err != nil {
+		// TODO: Log
+		fmt.Println("Could not get task %d: %s\n", tt.key, err.Error())
+		return
+	}
+
+	sfyTask := task.stringify()
+
+	// If we're not a true root, we need to add some lines
+	if len(prefix) > 0 {
+		if len(tt.nodes) > 0 {
+			sfyTask["name"] = fmt.Sprintf("%s%s> %s", string(prefix), "┬─", sfyTask["name"])
+		} else {
+			sfyTask["name"] = fmt.Sprintf("%s%s> %s", string(prefix), "──", sfyTask["name"])
+		}
+	}
+
+	printStringyTask(w, sfyTask)
+
+	subs := make([]uint64, len(tt.nodes))
+	i := 0
+	for k := range tt.nodes {
+		subs[i] = k
+		i++
+	}
+	sort.Slice(subs, func(i, j int) bool { return subs[i] < subs[j] })
+
+	final := len(tt.nodes) - 1
+
+	prefix = append(prefix, '├')
+	for i, skey := range subs {
+		// This needs to be inside the loop, so that we can revert the inner
+		// recursion's changes
+		if i == final {
+			prefix[len(prefix)-1] = '└'
+		} else {
+			prefix[len(prefix)-1] = '├'
+		}
+
+		// If we're grandchildren, we need to change the previous prefix
+		if len(prefix) > 1 {
+			switch prefix[len(prefix)-2] {
+			case '└':
+				prefix[len(prefix)-2] = ' '
+				break
+			case '├':
+				prefix[len(prefix)-2] = '│'
+				break
+			}
+		}
+
+		sub := tt.nodes[skey]
+		sub._print(prefix, w, get)
+	}
 }
