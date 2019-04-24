@@ -8,3 +8,7 @@ https://en.wikipedia.org/wiki/Project_management_software
 https://en.wikipedia.org/wiki/Project_anatomy
 https://en.wikipedia.org/wiki/Outline_of_project_management
 https://en.wikipedia.org/wiki/Work_breakdown_structure#100.25_rule
+
+## Other task engines
+
+https://taskwarrior.org/
