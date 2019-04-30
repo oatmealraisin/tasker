@@ -41,7 +41,7 @@ to quickly create a Cobra application.`,
 func init() {
 	TaskerCmd.AddCommand(finishCmd)
 
-	finishCmd.Flags().BoolVarP(&finishFlags.remove, "remove", "r", true, "Also remove the task from the list.")
+	finishCmd.Flags().BoolVarP(&finishFlags.remove, "remove", "R", false, "Also remove the task from the list.")
 	finishCmd.Flags().BoolVar(&finishFlags.dryRun, "dry-run", false, "Go through the steps but do nothing.")
 }
 

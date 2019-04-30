@@ -23,6 +23,7 @@ var getFlags struct {
 	tags            []string
 	tagsOpt         []string
 	includeFinished bool
+	includeRemoved  bool
 	dueBefore       string
 	createdAfter    string
 	tCreatedAfter   time.Time
@@ -57,7 +58,8 @@ func init() {
 	getCmd.Flags().StringSliceVarP(&getFlags.tags, "tag", "t", []string{}, "Get tasks from a tag. Can be invoked more than once to specify multiple tags.")
 	getCmd.Flags().StringSliceVar(&getFlags.tagsOpt, "has-tag", []string{}, "Get tasks from a tag. Can be invoked more than once to specify multiple tags.")
 	getCmd.Flags().Uint64VarP(&getFlags.uuid, "uuid", "u", 0, "Get tasks with matching uuid. Will only return one task.")
-	getCmd.Flags().BoolVar(&getFlags.includeFinished, "include-finished", false, "Also give tasks that have been finished.")
+	getCmd.Flags().BoolVar(&getFlags.includeFinished, "finished", false, "Also give tasks that have been finished.")
+	getCmd.Flags().BoolVar(&getFlags.includeRemoved, "removed", false, "Also give tasks that have been removed.")
 	getCmd.Flags().BoolVar(&getFlags.url, "url", false, "Print the URL associated with the task.")
 	getCmd.Flags().StringVar(&getFlags.dueBefore, "due-before", "", "Only show tasks due before a certain date.")
 	getCmd.Flags().StringVar(&getFlags.createdAfter, "created-after", "", "Only show tasks created after a certain date.")
@@ -115,6 +117,10 @@ func get(cmd *cobra.Command, args []string) error {
 
 	if !getFlags.includeFinished {
 		filterList = append(filterList, models.IsNotFinishedFilter())
+	}
+
+	if !getFlags.includeRemoved {
+		filterList = append(filterList, models.IsNotRemovedFilter())
 	}
 
 	if getFlags.createdAfter != "" {
