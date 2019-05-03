@@ -23,7 +23,7 @@ var (
 	minURLLen       int = minAgeLen + 7
 	minTagLen       int = minURLLen + 50
 	minDueLenLong   int = minTagLen + 10
-	minNameLenLong  int = minDueLenLong + 50
+	minNameLenLong  int = minDueLenLong + 10
 	minTagLenLong   int = minNameLenLong + 20
 
 	longNameLen int = 50
