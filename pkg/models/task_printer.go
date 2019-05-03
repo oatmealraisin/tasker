@@ -26,7 +26,7 @@ var (
 	minNameLenLong  int = minDueLenLong + 50
 	minTagLenLong   int = minNameLenLong + 20
 
-	longNameLen int = 90
+	longNameLen int = 50
 	longTagLen  int = 20
 
 	removeTag *regexp.Regexp = regexp.MustCompile("[^|]*(\\|\\.\\.\\.)?$")
