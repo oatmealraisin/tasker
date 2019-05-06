@@ -16,19 +16,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	name  string
-	size  int
-	tags  string
-	due_s string
-	due   time.Time
-	// TODO: Fix this
+var addFlags struct {
+	name       string
+	size       int
+	tags       string
+	due_s      string
+	due        time.Time
 	due_p      *timestamp.Timestamp
 	priority   int
 	url        string
 	importFile string
 	dryRun     bool
-)
+	parent     uint64
+}
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
@@ -53,14 +53,15 @@ to quickly create a Cobra application.`,
 func init() {
 	TaskerCmd.AddCommand(addCmd)
 
-	addCmd.Flags().StringVarP(&name, "name", "n", "", "Display name of the task")
-	addCmd.Flags().IntVarP(&size, "size", "s", 0, "Sizing for this task")
-	addCmd.Flags().StringVarP(&tags, "tags", "t", "", "Tags to put this task in")
-	addCmd.Flags().StringVarP(&due_s, "due", "d", "", "Due date of this task, in YYYY-MM-DD form.")
-	addCmd.Flags().IntVarP(&priority, "priority", "p", -1, "The priority of this task, how important it is.")
-	addCmd.Flags().StringVarP(&url, "url", "u", "", "Any URL resource associated with this tasks, such as an article.")
-	addCmd.Flags().StringVarP(&importFile, "from-file", "f", "", "Import tasks from a file. Can be csv.")
-	addCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Go through the steps but do nothing.")
+	addCmd.Flags().StringVarP(&addFlags.name, "name", "n", "", "Display name of the task")
+	addCmd.Flags().IntVarP(&addFlags.size, "size", "s", 0, "Sizing for this task")
+	addCmd.Flags().StringVarP(&addFlags.tags, "tags", "t", "", "Tags to put this task in")
+	addCmd.Flags().StringVarP(&addFlags.due_s, "due", "d", "", "Due date of this task, in YYYY-MM-DD form.")
+	addCmd.Flags().IntVarP(&addFlags.priority, "priority", "p", -1, "The priority of this task, how important it is.")
+	addCmd.Flags().StringVarP(&addFlags.url, "url", "u", "", "Any URL resource associated with this tasks, such as an article.")
+	addCmd.Flags().StringVarP(&addFlags.importFile, "from-file", "f", "", "Import tasks from a file. Can be csv.")
+	addCmd.Flags().BoolVar(&addFlags.dryRun, "dry-run", false, "Go through the steps but do nothing.")
+	addCmd.Flags().Uint64VarP(&addFlags.parent, "parent", "P", 0, "Specify the parent task of this task.")
 }
 
 // add is the running function for the `add` command.
@@ -81,7 +82,7 @@ func add(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if importFile != "" {
+	if addFlags.importFile != "" {
 		tasks, err = tasksFromFile()
 	} else {
 		tasks, err = tasksFromCmd(cmd, args)
@@ -107,21 +108,21 @@ func add(cmd *cobra.Command, args []string) error {
 // fields in the invocation.
 func validate(cmd *cobra.Command, args []string) error {
 	// TODO: Implement
-	if importFile != "" && (name != "" || size != 0 || tags != "" || priority < 0 || url != "") {
+	if addFlags.importFile != "" && (addFlags.name != "" || addFlags.size != 0 || addFlags.tags != "" || addFlags.priority < 0 || addFlags.url != "") {
 		//return fmt.Errorf("-f/--from-file cannot be used with other flags.")
 	}
 
-	if importFile != "" {
+	if addFlags.importFile != "" {
 		return nil
 	}
 
 	// TODO: Check for import_file existence and readable
 
-	if len(name) == 0 {
+	if len(addFlags.name) == 0 {
 		return fmt.Errorf("Need to provide name to add new task")
 	}
 
-	if size == 0 {
+	if addFlags.size == 0 {
 
 	}
 
@@ -135,7 +136,7 @@ func tasksFromFile() ([]models.Task, error) {
 	var err error
 	var result []models.Task
 
-	f, err := ioutil.ReadFile(importFile)
+	f, err := ioutil.ReadFile(addFlags.importFile)
 	if err != nil {
 		return []models.Task{}, err
 	}
@@ -165,26 +166,27 @@ func tasksFromCmd(cmd *cobra.Command, args []string) ([]models.Task, error) {
 	var err error
 	var result = make([]models.Task, 1)
 
-	if due_s != "" {
-		due, err = time.Parse("2007-01-02", due_s)
+	if addFlags.due_s != "" {
+		addFlags.due, err = time.Parse("2007-01-02", addFlags.due_s)
 		if err != nil {
 			return []models.Task{}, err
 		}
 
-		due_p, err = ptypes.TimestampProto(due)
+		addFlags.due_p, err = ptypes.TimestampProto(addFlags.due)
 		if err != nil {
 			return []models.Task{}, err
 		}
 	}
 
 	result[0] = models.Task{
-		Name:     name,
-		Size:     uint32(size),
-		Tags:     strings.Split(tags, viper.GetString("Delimiter")),
+		Name:     addFlags.name,
+		Size:     uint32(addFlags.size),
+		Tags:     strings.Split(addFlags.tags, viper.GetString("Delimiter")),
 		Added:    ptypes.TimestampNow(),
-		Due:      due_p,
-		Priority: uint32(priority),
-		Url:      url,
+		Due:      addFlags.due_p,
+		Priority: uint32(addFlags.priority),
+		Url:      addFlags.url,
+		Parent:   addFlags.parent,
 	}
 
 	return result, nil

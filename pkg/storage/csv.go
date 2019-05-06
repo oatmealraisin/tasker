@@ -114,6 +114,22 @@ func (c *CsvStorage) CreateTask(t models.Task) error {
 		t.Added = ptypes.TimestampNow()
 	}
 
+	if t.Parent != 0 {
+		p, err := c.GetTask(t.Parent)
+		if err != nil {
+			return err
+		}
+
+		old_p := p
+
+		p.Children = append(p.Subtasks, t.Guid)
+
+		err := s.bufferStorage.EditTask(oldTask, newTask)
+		if err != nil {
+			return err
+		}
+	}
+
 	c.queue = append(c.queue, t)
 
 	p_t := &c.queue[len(c.queue)-1]
