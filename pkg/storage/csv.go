@@ -117,14 +117,14 @@ func (c *CsvStorage) CreateTask(t models.Task) error {
 	if t.Parent != 0 {
 		p, err := c.GetTask(t.Parent)
 		if err != nil {
-			return err
+			return fmt.Errorf("Could not add Parent %d: %s", t.Parent, err.Error())
 		}
 
 		old_p := p
 
-		p.Children = append(p.Subtasks, t.Guid)
+		p.Subtasks = append(p.Subtasks, t.Guid)
 
-		err := s.bufferStorage.EditTask(oldTask, newTask)
+		err = c.bufferStorage.EditTask(old_p, p)
 		if err != nil {
 			return err
 		}
