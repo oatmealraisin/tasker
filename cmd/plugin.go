@@ -1,29 +1,33 @@
-// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
+// Tasker - A pluggable task server for keeping track of all those To-Do's
+// Copyright (C) 2019 Ryan Murphy <ryan@oatmealrais.in>
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
+
+	"github.com/oatmealraisin/tasker/pkg/plugins"
 )
 
 // pluginCmd represents the plugin command
 var pluginCmd = &cobra.Command{
 	Use:   "plugin",
-	Short: "A brief description of your command",
+	Short: "Add/remove plugins from tasker",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
@@ -31,20 +35,71 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("plugin called")
+		if err := cmd.RunE(cmd, args); err != nil {
+			log.Fatal(err.Error())
+		}
 	},
+	RunE: runPlugin,
+}
+
+var installCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install plugins to tasker.",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := cmd.RunE(cmd, args); err != nil {
+			log.Fatal(err.Error())
+		}
+	},
+	RunE: install,
+}
+
+var uninstallCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: "Uninstall plugins from tasker.",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := cmd.RunE(cmd, args); err != nil {
+			log.Fatal(err.Error())
+		}
+	},
+	RunE: uninstall,
 }
 
 func init() {
-	//TaskerCmd.AddCommand(pluginCmd)
+	TaskerCmd.AddCommand(pluginCmd)
+	pluginCmd.AddCommand(installCmd)
+	pluginCmd.AddCommand(uninstallCmd)
+}
 
-	// Here you will define your flags and configuration settings.
+// runPlugin does nothing, and is a placeholder for future functionality
+func runPlugin(cmd *cobra.Command, args []string) error {
+	return nil
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// pluginCmd.PersistentFlags().String("foo", "", "A help for foo")
+// install parses the cobra command and installs a plugin.
+func install(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("Need more arguments")
+	} else if len(args) > 1 {
+		return fmt.Errorf("Need less arguments")
+	}
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// pluginCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	return plugins.InstallFromFile(args[0])
+}
+
+// uninstall parses the cobra command and removes a plugin
+func uninstall(cmd *cobra.Command, args []string) error {
+	// TODO: Implement
+	return nil
 }

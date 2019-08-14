@@ -1,10 +1,28 @@
+// Tasker - A pluggable task server for keeping track of all those To-Do's
+// Copyright (C) 2019 Ryan Murphy <ryan@oatmealrais.in>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"plugin"
 
+	"github.com/oatmealraisin/tasker/pkg/plugins"
 	"github.com/oatmealraisin/tasker/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,6 +35,8 @@ var (
 	db         storage.Storage
 	termWidth  int
 	termHeight int
+
+	loadedPlugins []plugins.TaskerPlugin
 )
 
 // TaskerCmd represents the base command when called without any subcommands
@@ -26,13 +46,10 @@ var TaskerCmd = &cobra.Command{
 	Long:  ``,
 	Run:   statusCmd.Run,
 	RunE:  status,
-}
 
-// Execute adds all child commands to the root command and sets flags
-// appropriately.  This is called by main.main(). It only needs to happen once
-// to the TaskerCmd.
-func Execute() error {
-	return TaskerCmd.Execute()
+	//PreRun:  preRun,
+	//PostRun: postRun,
+	//TraverseChildren: false,
 }
 
 // Add persistent flags to the command, initialize the configuration.
@@ -44,9 +61,28 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// The config name is always "config". May make this changeable
+	viper.SetDefault("StorageType", "sqlite")
+	viper.SetDefault("WorkingDir", "$XDG_DATA_HOME/tasker")
+	viper.SetDefault("Delimiter", "|")
+	viper.SetDefault("EditCmd", "vi")
+	viper.SetDefault("PluginDir", "$XDG_CONFIG_HOME/tasker/autoload")
+
+	viper.SetEnvPrefix("tasker")
+	// This means that any config variable can be set using the corresponding
+	// TASKER_* environment variable
+	viper.AutomaticEnv()
+
 	if cfg != "" {
-		viper.SetConfigFile(cfg)
+		f, err := os.Open(cfg)
+		if err != nil {
+			panic(err.Error())
+		}
+		defer f.Close()
+
+		err = viper.ReadConfig(f)
+		if err != nil {
+			panic(err.Error())
+		}
 	} else {
 		viper.AddConfigPath("$XDG_CONFIG_HOME/tasker/")
 		viper.AddConfigPath("$HOME/.config/tasker/")
@@ -54,21 +90,11 @@ func initConfig() {
 		viper.AddConfigPath(".")
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("config")
-	}
 
-	viper.SetDefault("StorageType", "sqlite")
-	viper.SetDefault("WorkingDir", "$XDG_DATA_HOME/tasker")
-	viper.SetDefault("Delimiter", "|")
-	viper.SetDefault("EditCmd", "vi")
-
-	viper.SetEnvPrefix("tasker")
-	viper.AutomaticEnv()
-	// This means that any config variable can be set using the corresponding
-	// TASKER_* environment variable
-
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Printf("Could not read config file: %s\n", err.Error())
-		os.Exit(1)
+		if err := viper.ReadInConfig(); err != nil {
+			fmt.Printf("Could not read config file: %s\n", err.Error())
+			os.Exit(1)
+		}
 	}
 
 	switch viper.GetString("StorageType") {
@@ -89,4 +115,44 @@ func initConfig() {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		termWidth = 200
 	}
+
+	pluginDir := viper.GetString("PluginDir")
+	if pluginDir != "" {
+		pluginDir = os.ExpandEnv(pluginDir)
+		fns, err := ioutil.ReadDir(pluginDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: Could not open plugin directory %s: %s\n", pluginDir, err.Error())
+		}
+
+		for _, fn := range fns {
+			//fmt.Printf("%s\n", filepath.Join(pluginDir, fn.Name()))
+			p, err := plugin.Open(filepath.Join(pluginDir, fn.Name()))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: Could not load plugin %s: %s\n", fn.Name(), err.Error())
+			}
+
+			sym, err := p.Lookup("Plugin")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not have a Plugin object: %s\n", fn.Name(), err.Error())
+			}
+
+			newPlugin, ok := sym.(plugins.TaskerPlugin)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not implement the TaskerPlugin interface!\n", fn.Name())
+			}
+
+			loadedPlugins = append(loadedPlugins, newPlugin)
+
+			go func() {
+				newPlugin.Initialize()
+			}()
+		}
+	}
+}
+
+// Execute adds all child commands to the root command and sets flags
+// appropriately.  This is called by main.main(). It only needs to happen once
+// to the TaskerCmd.
+func Execute() error {
+	return TaskerCmd.Execute()
 }
