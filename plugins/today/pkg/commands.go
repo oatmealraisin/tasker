@@ -18,33 +18,42 @@ package today
 
 import (
 	"log"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
 
 func (t *Today) run(cmd *cobra.Command, args []string) error {
-	for !t.initialized {
+	for !t.Initialized {
 	}
 
-	err := t.update()
-	if err != nil {
-		return err
-	}
-
-	t.printAll()
+	t.printToday()
 
 	return nil
 }
 
 func (t *Today) add(cmd *cobra.Command, args []string) error {
-	for !t.initialized {
+	for !t.Initialized {
+	}
+
+	uuid, err := strconv.ParseUint(args[0], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := t.Tasks[t.Now]; ok {
+		print("Appending task\n")
+		t.Tasks[t.Now] = append(t.Tasks[t.Now], uuid)
+	} else {
+		print("Creating new day\n")
+		t.Tasks[t.Now] = []uint64{uuid}
 	}
 
 	return nil
 }
 
 func (t *Today) rm(cmd *cobra.Command, args []string) error {
-	for !t.initialized {
+	for !t.Initialized {
 	}
 
 	return nil

@@ -17,11 +17,8 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
-	"plugin"
 
 	"github.com/oatmealraisin/tasker/cmd"
 	"github.com/oatmealraisin/tasker/pkg/plugins"
@@ -30,6 +27,7 @@ import (
 )
 
 func main() {
+	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
 	var config *string = pflag.StringP("config", "c", "", "")
 	// Make sure pflag doesn't grab the program when we ask for help..
 	var _ *bool = pflag.BoolP("help", "h", false, "")
@@ -64,34 +62,16 @@ func main() {
 		}
 	}
 
-	pluginDir := viper.GetString("PluginDir")
-	if pluginDir != "" {
-		pluginDir = os.ExpandEnv(pluginDir)
-		fns, err := ioutil.ReadDir(pluginDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: Could not open plugin directory %s: %s\n", pluginDir, err.Error())
-		}
+	err := plugins.LoadPlugins()
+	if err != nil {
+		panic(err.Error())
+	}
+	defer plugins.UnloadPlugins()
 
-		for _, fn := range fns {
-			//	fmt.Printf("%s\n", filepath.Join(pluginDir, fn.Name()))
-			p, err := plugin.Open(filepath.Join(pluginDir, fn.Name()))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: Could not load plugin %s: %s\n", fn.Name(), err.Error())
-			}
-
-			sym, err := p.Lookup("Plugin")
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not have a Plugin object: %s\n", fn.Name(), err.Error())
-			}
-
-			newPlugin, ok := sym.(plugins.TaskerPlugin)
-			if !ok {
-				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not implement the TaskerPlugin interface!\n", fn.Name())
-			}
-
-			if commandsPlug, ok := newPlugin.(plugins.TaskerCommand); ok {
-				cmd.TaskerCmd.AddCommand(commandsPlug.Commands()...)
-			}
+	plugs := plugins.GetPlugins()
+	for _, plug := range plugs {
+		if commandsPlug, ok := plug.(plugins.TaskerCommand); ok {
+			cmd.TaskerCmd.AddCommand(commandsPlug.Commands()...)
 		}
 	}
 

@@ -16,20 +16,46 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package today
 
-import "github.com/oatmealraisin/tasker/pkg/storage"
+import (
+	"fmt"
+
+	"github.com/oatmealraisin/tasker/pkg/models"
+	"github.com/oatmealraisin/tasker/pkg/storage"
+)
 
 type Today struct {
-	tasks       map[string][]uint64
-	today       []uint64
-	initialized bool
+	Tasks       map[string][]uint64
+	Today       []uint64 `json: "-"`
+	Now         string   `json: "-"`
+	Yesterday   string   `json: "-"`
+	Initialized bool     `json: "-"`
 
-	get storage.GetFunc
+	Get storage.GetFunc `json: "-"`
 }
 
-func (t *Today) update() error {
-	return nil
-}
+func (t *Today) printToday() {
 
-func (t *Today) printAll() {
+	t.printDate(t.Now)
+
+	if len(t.Today) == 0 {
+		if yest, ok := t.Tasks[t.Yesterday]; ok && len(yest) > 0 {
+			fmt.Println("Here's what happened yesterday:")
+			t.printDate(t.Yesterday)
+		}
+	}
+
 	return
+}
+
+func (t *Today) printDate(day string) {
+	// TODO: Check validity of day
+	if uuids, ok := t.Tasks[day]; ok {
+		if t.Get == nil {
+			fmt.Println(uuids)
+		} else {
+			models.PrintTasks(uuids, t.Get)
+		}
+	} else {
+		fmt.Printf("That's all for %s\n", day)
+	}
 }

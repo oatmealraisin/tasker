@@ -1,1 +1,3 @@
 *.pb.go
+tasker
+*.so

@@ -1,5 +1,4 @@
 // Tasker - A pluggable task server for keeping track of all those To-Do's
-// Today - A plugin for focusing on a subset of tasks just for today
 // Copyright (C) 2019 Ryan Murphy <ryan@oatmealrais.in>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -14,13 +13,14 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-package main
+package gui
 
-import (
-	"github.com/oatmealraisin/tasker/pkg/plugins"
-	today "github.com/oatmealraisin/tasker/plugins/today/pkg"
+type UIType int
+
+const (
+	Cli      UIType = iota
+	Tui             = iota
+	Gtk             = iota
+	Electron        = iota
+	Webapp          = iota
 )
-
-func Plugin() plugins.TaskerPlugin {
-	return &today.Today{}
-}

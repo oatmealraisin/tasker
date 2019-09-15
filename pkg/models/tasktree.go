@@ -20,7 +20,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/oatmealraisin/tasker/pkg/gui/terminal"
+	terminal "github.com/oatmealraisin/tasker/pkg/ui/cli"
 )
 
 // TaskTree is a data structure for navigating the parent/child relationship of

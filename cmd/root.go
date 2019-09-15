@@ -17,10 +17,8 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"plugin"
 
 	"github.com/oatmealraisin/tasker/pkg/plugins"
 	"github.com/oatmealraisin/tasker/pkg/storage"
@@ -35,8 +33,6 @@ var (
 	db         storage.Storage
 	termWidth  int
 	termHeight int
-
-	loadedPlugins []plugins.TaskerPlugin
 )
 
 // TaskerCmd represents the base command when called without any subcommands
@@ -47,8 +43,6 @@ var TaskerCmd = &cobra.Command{
 	Run:   statusCmd.Run,
 	RunE:  status,
 
-	//PreRun:  preRun,
-	//PostRun: postRun,
 	//TraverseChildren: false,
 }
 
@@ -116,36 +110,17 @@ func initConfig() {
 		termWidth = 200
 	}
 
-	pluginDir := viper.GetString("PluginDir")
-	if pluginDir != "" {
-		pluginDir = os.ExpandEnv(pluginDir)
-		fns, err := ioutil.ReadDir(pluginDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: Could not open plugin directory %s: %s\n", pluginDir, err.Error())
+	for _, plug := range plugins.GetPlugins() {
+		if createPlug, ok := plug.(plugins.TaskCreator); ok {
+			createPlug.SetCreateFunc(db.CreateTask)
 		}
 
-		for _, fn := range fns {
-			//fmt.Printf("%s\n", filepath.Join(pluginDir, fn.Name()))
-			p, err := plugin.Open(filepath.Join(pluginDir, fn.Name()))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: Could not load plugin %s: %s\n", fn.Name(), err.Error())
-			}
+		if editPlug, ok := plug.(plugins.TaskEditor); ok {
+			editPlug.SetEditFunc(db.EditTask)
+		}
 
-			sym, err := p.Lookup("Plugin")
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not have a Plugin object: %s\n", fn.Name(), err.Error())
-			}
-
-			newPlugin, ok := sym.(plugins.TaskerPlugin)
-			if !ok {
-				fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not implement the TaskerPlugin interface!\n", fn.Name())
-			}
-
-			loadedPlugins = append(loadedPlugins, newPlugin)
-
-			go func() {
-				newPlugin.Initialize()
-			}()
+		if viewPlug, ok := plug.(plugins.TaskViewer); ok {
+			viewPlug.SetGetFunc(db.GetTask)
 		}
 	}
 }

@@ -1,5 +1,4 @@
 // Tasker - A pluggable task server for keeping track of all those To-Do's
-// Today - A plugin for focusing on a subset of tasks just for today
 // Copyright (C) 2019 Ryan Murphy <ryan@oatmealrais.in>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -14,13 +13,31 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-package main
+package plugins
 
-import (
-	"github.com/oatmealraisin/tasker/pkg/plugins"
-	today "github.com/oatmealraisin/tasker/plugins/today/pkg"
-)
+import "fmt"
 
-func Plugin() plugins.TaskerPlugin {
-	return &today.Today{}
+type NoPluginError struct {
+	Name string
+}
+
+func (e *NoPluginError) Error() string {
+	return fmt.Sprintf("ERROR: 'Plugin %s' has not exported a Plugin", e.Name)
+}
+
+func NewNoPluginError(pluginName string) error {
+	return &NoPluginError{Name: pluginName}
+}
+
+type NotTaskerPluginError struct {
+	Name string
+}
+
+func (e *NotTaskerPluginError) Error() string {
+	msg := "Plugin '%s' does not implement the TaskerPlugin interface!"
+	return fmt.Sprintf(msg, e.Name)
+}
+
+func NewNotTaskerPluginError(pluginName string) error {
+	return &NotTaskerPluginError{Name: pluginName}
 }

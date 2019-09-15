@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"plugin"
 
 	"github.com/spf13/viper"
 )
@@ -41,19 +40,14 @@ func InstallFromFile(fn string) error {
 		return fmt.Errorf("Could not open given file: %s", err.Error())
 	}
 
-	so, err := plugin.Open(f.Name())
+	newPlugin, err := loadPlugin(f.Name())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: Could not load plugin %s: %s\n", f.Name(), err.Error())
+		return err
 	}
 
-	sym, err := so.Lookup("Plugin")
+	err = newPlugin.Install()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not have a Plugin object: %s\n", f.Name(), err.Error())
-	}
-
-	newPlugin, ok := sym.(TaskerPlugin)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "ERROR: Plugin '%s' does not implement the TaskerPlugin interface!\n", f.Name())
+		return err
 	}
 
 	dst, err := os.Create(filepath.Join(pluginDir, path.Base(f.Name())))
@@ -72,5 +66,17 @@ func InstallFromFile(fn string) error {
 		return err
 	}
 
-	return newPlugin.Install()
+	return nil
+}
+
+func InstallFromGit(url string) (*TaskerPlugin, error) {
+	// TODO: Check for .so in tld of project
+	// TODO: Check for Makefile target in tld of project
+	return nil, nil
+}
+
+func InstallFromUrl(url string) (*TaskerPlugin, error) {
+	// TODO: check for git
+
+	return nil, nil
 }

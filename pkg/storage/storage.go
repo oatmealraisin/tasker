@@ -35,4 +35,6 @@ func setupStorageDir() error {
 	return err
 }
 
+type CreateFunc func(t models.Task) error
 type GetFunc func(uuid uint64) (models.Task, error)
+type EditFunc func(oldTask, newTask models.Task) error
