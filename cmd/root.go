@@ -30,6 +30,7 @@ import (
 
 var (
 	cfg        string
+	noPlugins  bool
 	db         storage.Storage
 	termWidth  int
 	termHeight int
@@ -51,6 +52,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	TaskerCmd.PersistentFlags().StringVarP(&cfg, "config", "c", "", "Config directory to use.")
+	TaskerCmd.PersistentFlags().BoolVar(&noPlugins, "no-plugins", false, "Config directory to use.")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -110,17 +112,19 @@ func initConfig() {
 		termWidth = 200
 	}
 
-	for _, plug := range plugins.GetPlugins() {
-		if createPlug, ok := plug.(plugins.TaskCreator); ok {
-			createPlug.SetCreateFunc(db.CreateTask)
-		}
+	if !noPlugins {
+		for _, plug := range plugins.GetPlugins() {
+			if createPlug, ok := plug.(plugins.TaskCreator); ok {
+				createPlug.SetCreateFunc(db.CreateTask)
+			}
 
-		if editPlug, ok := plug.(plugins.TaskEditor); ok {
-			editPlug.SetEditFunc(db.EditTask)
-		}
+			if editPlug, ok := plug.(plugins.TaskEditor); ok {
+				editPlug.SetEditFunc(db.EditTask)
+			}
 
-		if viewPlug, ok := plug.(plugins.TaskViewer); ok {
-			viewPlug.SetGetFunc(db.GetTask)
+			if viewPlug, ok := plug.(plugins.TaskViewer); ok {
+				viewPlug.SetGetFunc(db.GetTask)
+			}
 		}
 	}
 }

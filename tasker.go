@@ -29,6 +29,7 @@ import (
 func main() {
 	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
 	var config *string = pflag.StringP("config", "c", "", "")
+	var noPlugins *bool = pflag.Bool("no-plugins", false, "")
 	// Make sure pflag doesn't grab the program when we ask for help..
 	var _ *bool = pflag.BoolP("help", "h", false, "")
 	pflag.Parse()
@@ -62,16 +63,18 @@ func main() {
 		}
 	}
 
-	err := plugins.LoadPlugins()
-	if err != nil {
-		panic(err.Error())
-	}
-	defer plugins.UnloadPlugins()
+	if !(*noPlugins) {
+		err := plugins.LoadPlugins()
+		if err != nil {
+			panic(err.Error())
+		}
+		defer plugins.UnloadPlugins()
 
-	plugs := plugins.GetPlugins()
-	for _, plug := range plugs {
-		if commandsPlug, ok := plug.(plugins.TaskerCommand); ok {
-			cmd.TaskerCmd.AddCommand(commandsPlug.Commands()...)
+		plugs := plugins.GetPlugins()
+		for _, plug := range plugs {
+			if commandsPlug, ok := plug.(plugins.TaskerCommand); ok {
+				cmd.TaskerCmd.AddCommand(commandsPlug.Commands()...)
+			}
 		}
 	}
 
