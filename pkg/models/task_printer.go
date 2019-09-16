@@ -202,18 +202,29 @@ func printStringyTask(w io.Writer, sfyTask map[string]string) {
 	}
 
 	name := sfyTask["name"]
+
+	// If the name was crossed out (if it was finished), we still want it to
+	// be aligned with task names that are not finished
+	if strings.Contains(name, "[0m") {
+		name = name[:len(name)-4]
+	}
+
 	if termWidth > minNameLenLong {
 		maxNameLen := int(math.Max(float64(minNameLenShort), float64(termWidth-55)))
 
 		if len(name) > maxNameLen {
-			name = fmt.Sprintf("%s ...", name[:maxNameLen])
+			name = fmt.Sprintf("%s\x1B[0m ...", name[:maxNameLen])
+		} else {
+			name = fmt.Sprintf("%s\x1B[0m", name)
 		}
 	} else if termWidth > minNameLenShort {
 		if len(name) > longNameLen {
-			name = fmt.Sprintf("%s ...", name[:longNameLen])
+			name = fmt.Sprintf("%s\x1B[0m ...", name[:longNameLen])
+		} else {
+			name = fmt.Sprintf("%s\x1B[0m", name)
 		}
 	} else {
-		name = fmt.Sprintf("%s ...", name[:termWidth-4])
+		name = fmt.Sprintf("%s\x1B[0m ...", name[:termWidth-4])
 	}
 
 	p(name)
