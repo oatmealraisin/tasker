@@ -28,6 +28,7 @@ var getFlags struct {
 	createdAfter    string
 	tCreatedAfter   time.Time
 	url             bool
+	name            bool
 }
 
 // getCmd represents the get command, mostly Cobra boilerplate
@@ -61,6 +62,7 @@ func init() {
 	getCmd.Flags().BoolVar(&getFlags.includeFinished, "finished", false, "Also give tasks that have been finished.")
 	getCmd.Flags().BoolVar(&getFlags.includeRemoved, "removed", false, "Also give tasks that have been removed.")
 	getCmd.Flags().BoolVar(&getFlags.url, "url", false, "Print the URL associated with the task.")
+	getCmd.Flags().BoolVar(&getFlags.name, "name", false, "Print the name of the task only.")
 	getCmd.Flags().StringVar(&getFlags.dueBefore, "due-before", "", "Only show tasks due before a certain date.")
 	getCmd.Flags().StringVar(&getFlags.createdAfter, "created-after", "", "Only show tasks created after a certain date.")
 }
@@ -140,6 +142,16 @@ func get(cmd *cobra.Command, args []string) error {
 			if task.Url != "" {
 				fmt.Printf("%s\n", task.Url)
 			}
+		}
+	} else if getFlags.name {
+		for _, uuid := range tasks {
+			task, err := db.GetTask(uuid)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not get task %d.\n%s", uuid, err.Error())
+				continue
+			}
+
+			fmt.Printf("%s\n", task.Name)
 		}
 	} else {
 		models.PrintTasks(tasks, db.GetTask)
