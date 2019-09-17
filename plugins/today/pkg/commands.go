@@ -17,8 +17,11 @@
 package today
 
 import (
+	"fmt"
 	"log"
+	"sort"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +30,15 @@ func (t *Today) run(cmd *cobra.Command, args []string) error {
 	for !t.Initialized {
 	}
 
-	t.printToday()
+	if len(args) > 0 {
+		_, err := time.Parse("2006-1-2", args[0])
+		if err != nil {
+			return err
+		}
+		t.printDate(args[0])
+	} else {
+		t.printToday()
+	}
 
 	return nil
 }
@@ -36,17 +47,24 @@ func (t *Today) add(cmd *cobra.Command, args []string) error {
 	for !t.Initialized {
 	}
 
-	uuid, err := strconv.ParseUint(args[0], 10, 64)
-	if err != nil {
-		return err
-	}
+	add_date := t.Now
+	for _, x := range args {
+		uuid, err := strconv.ParseUint(x, 10, 64)
+		if err != nil {
+			_, err = time.Parse("2006-1-2", x)
+			if err != nil {
+				return err
+			}
 
-	if _, ok := t.Tasks[t.Now]; ok {
-		print("Appending task\n")
-		t.Tasks[t.Now] = append(t.Tasks[t.Now], uuid)
-	} else {
-		print("Creating new day\n")
-		t.Tasks[t.Now] = []uint64{uuid}
+			add_date = x
+			continue
+		}
+
+		if _, ok := t.Tasks[add_date]; ok {
+			t.Tasks[add_date] = append(t.Tasks[add_date], uuid)
+		} else {
+			t.Tasks[add_date] = []uint64{uuid}
+		}
 	}
 
 	return nil
@@ -54,6 +72,33 @@ func (t *Today) add(cmd *cobra.Command, args []string) error {
 
 func (t *Today) rm(cmd *cobra.Command, args []string) error {
 	for !t.Initialized {
+	}
+
+	return nil
+}
+
+func (t *Today) list(cmd *cobra.Command, args []string) error {
+	keys := []string{}
+	for k := range t.Tasks {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(a, b int) bool {
+		a_time, err := time.Parse("2006-1-2", keys[a])
+		if err != nil {
+			return false
+		}
+
+		b_time, err := time.Parse("2006-1-2", keys[b])
+		if err != nil {
+			return true
+		}
+
+		return b_time.Before(a_time)
+	})
+
+	for i := 0; i < 10; i++ {
+		fmt.Printf("%s: %d\n", keys[i], len(t.Tasks[keys[i]]))
 	}
 
 	return nil
@@ -117,8 +162,28 @@ to quickly create a Cobra application.`,
 		},
 	}
 
+	todayListCmd := &cobra.Command{
+		Use:   "list",
+		Short: "A plugin for focusing on a subset of tasks just for today",
+		Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := cmd.RunE(cmd, args); err != nil {
+				log.Fatal(err.Error())
+			}
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return t.list(cmd, args)
+		},
+	}
+
 	todayCmd.AddCommand(todayAddCmd)
 	todayCmd.AddCommand(todayRmCmd)
+	todayCmd.AddCommand(todayListCmd)
 
 	return []*cobra.Command{todayCmd}
 }

@@ -18,6 +18,7 @@ package today
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/oatmealraisin/tasker/pkg/models"
 	"github.com/oatmealraisin/tasker/pkg/storage"
@@ -33,20 +34,38 @@ type Today struct {
 	Get storage.GetFunc `json: "-"`
 }
 
+// A utility function for standard today usage. Will either print the content of
+// the tasks registered for the current day, the content of the tasks registered
+// for the next previously registered day, or nothing if no previous date has
+// been registered.
 func (t *Today) printToday() {
-
 	t.printDate(t.Now)
 
 	if len(t.Today) == 0 {
-		if yest, ok := t.Tasks[t.Yesterday]; ok && len(yest) > 0 {
-			fmt.Println("Here's what happened yesterday:")
-			t.printDate(t.Yesterday)
+		prev := time.Now()
+		for i := 0; i < 14; i++ {
+			prev = prev.Add(-time.Hour * 24)
+			prevYMD := fmt.Sprintf(
+				"%d-%d-%d",
+				prev.Year(),
+				prev.Month(),
+				prev.Day(),
+			)
+			if prevTasks, ok := t.Tasks[prevYMD]; ok && len(prevTasks) > 0 {
+				fmt.Printf("Here's what happened %s:\n", prevYMD)
+				t.printDate(prevYMD)
+				return
+			}
 		}
 	}
 
 	return
 }
 
+// A generic function for printing any date from the days registered with today.
+// Will either print the content of the days tasks using tasker libraries, or
+// will print out a message telling the user that there is nothing to do.
+// The date must be formatted '2006-1-2'.
 func (t *Today) printDate(day string) {
 	// TODO: Check validity of day
 	if uuids, ok := t.Tasks[day]; ok {
