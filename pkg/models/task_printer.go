@@ -205,27 +205,32 @@ func printStringyTask(w io.Writer, sfyTask map[string]string) {
 
 	// If the name was crossed out (if it was finished), we still want it to
 	// be aligned with task names that are not finished
-	if strings.Contains(name, "[0m") {
-		name = name[:len(name)-4]
-	}
+	hasEscape := strings.Contains(name, "[0m")
 
+	nameCutoff := 0
 	if termWidth > minNameLenLong {
-		maxNameLen := int(math.Max(float64(minNameLenShort), float64(termWidth-55)))
-
-		if len(name) > maxNameLen {
-			name = fmt.Sprintf("%s\x1B[0m ...", name[:maxNameLen])
-		} else {
-			name = fmt.Sprintf("%s\x1B[0m", name)
-		}
+		nameCutoff = int(math.Max(float64(minNameLenShort), float64(termWidth-55)))
 	} else if termWidth > minNameLenShort {
-		if len(name) > longNameLen {
-			name = fmt.Sprintf("%s\x1B[0m ...", name[:longNameLen])
-		} else {
-			name = fmt.Sprintf("%s\x1B[0m", name)
-		}
+		nameCutoff = longNameLen
 	} else {
-		name = fmt.Sprintf("%s\x1B[0m ...", name[:termWidth-4])
+		nameCutoff = termWidth - 4
 	}
+
+	if hasEscape {
+		name = name[:len(name)-4]
+		nameCutoff = nameCutoff + 4
+	}
+
+	if len(name) > nameCutoff {
+		bName := []byte(fmt.Sprintf("%s", name[:nameCutoff]))
+		bName[nameCutoff-1] = '.'
+		bName[nameCutoff-2] = '.'
+		bName[nameCutoff-3] = '.'
+		bName[nameCutoff-4] = ' '
+		name = string(bName)
+	}
+
+	name = fmt.Sprintf("%s\x1B[0m", name)
 
 	p(name)
 
